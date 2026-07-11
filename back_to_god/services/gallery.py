@@ -1,0 +1,308 @@
+from __future__ import annotations
+
+import sqlite3
+from werkzeug.datastructures import FileStorage
+
+from back_to_god.core.db import connect_database, get_db
+from back_to_god.core.security import utc_now
+from back_to_god.services.users import normalize_text
+
+
+IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+VIDEO_TYPES = {"video/mp4", "video/webm", "video/ogg"}
+MAX_IMAGE_BYTES = 12 * 1024 * 1024
+MAX_VIDEO_BYTES = 512 * 1024 * 1024
+DEFAULT_CATEGORIES = ["Services", "Choir", "Youth", "Outreach", "Fellowship"]
+
+
+def can_manage_gallery(role: str) -> bool:
+    return role in {"super_admin", "admin"}
+
+
+def _media_kind(mime_type: str) -> str | None:
+    base_type = (mime_type or "").split(";")[0].lower()
+    if base_type in IMAGE_TYPES:
+        return "image"
+    if base_type in VIDEO_TYPES:
+        return "video"
+    return None
+
+
+def _validate_media(file: FileStorage) -> tuple[str, str, bytes]:
+    data = file.read()
+    mime_type = (file.mimetype or "").split(";")[0].lower()
+    media_kind = _media_kind(mime_type)
+    if media_kind is None:
+        raise ValueError("Only image and video files are supported in the gallery.")
+    if not data:
+        raise ValueError("Uploaded gallery media is empty.")
+    if media_kind == "image" and len(data) > MAX_IMAGE_BYTES:
+        raise ValueError("Gallery images must be 12 MB or smaller.")
+    if media_kind == "video" and len(data) > MAX_VIDEO_BYTES:
+        raise ValueError("Gallery videos must be 512 MB or smaller.")
+    return media_kind, mime_type, data
+
+
+def ensure_default_categories() -> None:
+    for category in DEFAULT_CATEGORIES:
+        ensure_category(category)
+
+
+def ensure_category(name: str) -> int:
+    compact_name = normalize_text(name, 80) or "General"
+    db = get_db()
+    existing = db.execute(
+        """
+        SELECT id
+        FROM gallery_categories
+        WHERE lower(name) = lower(?)
+        """,
+        (compact_name,),
+    ).fetchone()
+    if existing is not None:
+        return int(existing["id"])
+
+    cursor = db.execute(
+        """
+        INSERT INTO gallery_categories (name, created_at)
+        VALUES (?, ?)
+        """,
+        (compact_name, utc_now()),
+    )
+    db.commit()
+    return int(cursor.lastrowid)
+
+
+def list_categories() -> list[sqlite3.Row]:
+    ensure_default_categories()
+    return get_db().execute(
+        """
+        SELECT gallery_categories.*, COUNT(gallery_media.id) AS media_count
+        FROM gallery_categories
+        LEFT JOIN gallery_media
+          ON gallery_media.category_id = gallery_categories.id
+         AND gallery_media.deleted_at IS NULL
+        GROUP BY gallery_categories.id
+        ORDER BY gallery_categories.name COLLATE NOCASE
+        """
+    ).fetchall()
+
+
+def create_gallery_media(
+    title: str,
+    description: str,
+    category_name: str,
+    event_at: str,
+    files: list[FileStorage],
+    uploaded_by: int,
+) -> list[int]:
+    compact_title = normalize_text(title, 120)
+    compact_description = normalize_text(description, 900)
+    compact_event_at = normalize_text(event_at, 30)
+    usable_files = [file for file in files if file and file.filename]
+    if not compact_title:
+        raise ValueError("Add a title for the gallery upload.")
+    if not usable_files:
+        raise ValueError("Choose at least one picture or video.")
+
+    category_id = ensure_category(category_name)
+    now = utc_now()
+    media_ids: list[int] = []
+    db = get_db()
+    for file in usable_files:
+        media_kind, mime_type, data = _validate_media(file)
+        cursor = db.execute(
+            """
+            INSERT INTO gallery_media (
+                category_id, title, description, event_at, media_kind, mime_type,
+                original_name, size_bytes, data, uploaded_by, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                category_id,
+                compact_title,
+                compact_description,
+                compact_event_at,
+                media_kind,
+                mime_type,
+                normalize_text(file.filename, 160),
+                len(data),
+                data,
+                uploaded_by,
+                now,
+                now,
+            ),
+        )
+        media_ids.append(int(cursor.lastrowid))
+    db.commit()
+    return media_ids
+
+
+def _gallery_where(
+    query: str,
+    media_kind: str,
+    category_id: int,
+) -> tuple[str, list[object]]:
+    compact_query = normalize_text(query, 80)
+    compact_kind = media_kind if media_kind in {"image", "video"} else ""
+    params: list[object] = []
+    where = "gallery_media.deleted_at IS NULL"
+
+    if compact_kind:
+        where += " AND gallery_media.media_kind = ?"
+        params.append(compact_kind)
+    if category_id > 0:
+        where += " AND gallery_media.category_id = ?"
+        params.append(category_id)
+    if compact_query:
+        like = f"%{compact_query}%"
+        where += """
+            AND (
+                gallery_media.title LIKE ?
+                OR gallery_media.description LIKE ?
+                OR gallery_media.original_name LIKE ?
+                OR gallery_categories.name LIKE ?
+                OR users.full_name LIKE ?
+            )
+        """
+        params.extend([like, like, like, like, like])
+
+    return where, params
+
+
+def gallery_media_count(
+    query: str = "",
+    media_kind: str = "",
+    category_id: int = 0,
+) -> int:
+    where, params = _gallery_where(query, media_kind, category_id)
+    row = get_db().execute(
+        f"""
+        SELECT COUNT(*) AS count
+        FROM gallery_media
+        JOIN gallery_categories ON gallery_categories.id = gallery_media.category_id
+        JOIN users ON users.id = gallery_media.uploaded_by
+        WHERE {where}
+        """,
+        tuple(params),
+    ).fetchone()
+    return int(row["count"])
+
+
+def latest_gallery_update() -> str:
+    row = get_db().execute(
+        "SELECT COALESCE(MAX(updated_at), '') AS latest_update FROM gallery_media"
+    ).fetchone()
+    return row["latest_update"] if row else ""
+
+
+def list_gallery_media(
+    query: str = "",
+    media_kind: str = "",
+    category_id: int = 0,
+    limit: int = 18,
+    offset: int = 0,
+) -> list[sqlite3.Row]:
+    where, params = _gallery_where(query, media_kind, category_id)
+    params.extend([limit, offset])
+    return get_db().execute(
+        f"""
+        SELECT
+            gallery_media.id,
+            gallery_media.category_id,
+            gallery_media.title,
+            gallery_media.description,
+            gallery_media.event_at,
+            gallery_media.media_kind,
+            gallery_media.mime_type,
+            gallery_media.original_name,
+            gallery_media.size_bytes,
+            gallery_media.created_at,
+            gallery_categories.name AS category_name,
+            users.full_name AS uploaded_by_name
+        FROM gallery_media
+        JOIN gallery_categories ON gallery_categories.id = gallery_media.category_id
+        JOIN users ON users.id = gallery_media.uploaded_by
+        WHERE {where}
+        ORDER BY
+            datetime(COALESCE(NULLIF(gallery_media.event_at, ''), gallery_media.created_at)) DESC,
+            gallery_media.id DESC
+        LIMIT ? OFFSET ?
+        """,
+        tuple(params),
+    ).fetchall()
+
+
+def list_gallery_category_groups(
+    query: str = "",
+    media_kind: str = "",
+) -> list[dict]:
+    groups: dict[int, dict] = {}
+    for media in list_gallery_media(query, media_kind, 0, 5000, 0):
+        category_id = int(media["category_id"])
+        if category_id not in groups:
+            groups[category_id] = {
+                "id": category_id,
+                "name": media["category_name"],
+                "media_count": 0,
+                "image_count": 0,
+                "video_count": 0,
+                "preview_media_id": media["id"],
+                "preview_media_kind": media["media_kind"],
+                "preview_title": media["title"],
+                "latest_at": media["event_at"] or media["created_at"],
+            }
+        group = groups[category_id]
+        group["media_count"] += 1
+        if media["media_kind"] == "image":
+            group["image_count"] += 1
+        if media["media_kind"] == "video":
+            group["video_count"] += 1
+    return sorted(groups.values(), key=lambda item: item["latest_at"] or "", reverse=True)
+
+
+def get_gallery_media(media_id: int) -> sqlite3.Row | None:
+    return get_db().execute(
+        """
+        SELECT
+            gallery_media.*,
+            gallery_categories.name AS category_name,
+            users.full_name AS uploaded_by_name
+        FROM gallery_media
+        JOIN gallery_categories ON gallery_categories.id = gallery_media.category_id
+        JOIN users ON users.id = gallery_media.uploaded_by
+        WHERE gallery_media.id = ? AND gallery_media.deleted_at IS NULL
+        """,
+        (media_id,),
+    ).fetchone()
+
+
+def gallery_media_bytes(media_id: int):
+    connection = connect_database()
+    try:
+        row = connection.execute(
+            "SELECT data FROM gallery_media WHERE id = ? AND deleted_at IS NULL",
+            (media_id,),
+        ).fetchone()
+        if row:
+            yield row[0]
+    finally:
+        connection.close()
+
+
+def soft_delete_gallery_media(media_id: int, deleted_by: int) -> sqlite3.Row | None:
+    item = get_gallery_media(media_id)
+    if item is None:
+        return None
+    now = utc_now()
+    get_db().execute(
+        """
+        UPDATE gallery_media
+        SET deleted_at = ?, deleted_by = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (now, deleted_by, now, media_id),
+    )
+    get_db().commit()
+    return item

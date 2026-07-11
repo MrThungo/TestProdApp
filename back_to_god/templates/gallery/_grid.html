@@ -1,0 +1,76 @@
+<section
+  class="gallery-live-region"
+  data-live-fragment
+  data-live-fragment-url="{{ url_for('gallery.poll') }}"
+  data-live-latest="{{ latest_update|default('') }}"
+>
+  <section class="gallery-category-strip" aria-label="Gallery categories">
+    <a class="{% if not category_id %}active{% endif %}" href="{{ url_for('gallery.index', q=query, kind=media_kind) }}">All</a>
+    {% for category in categories %}
+      <a class="{% if category_id == category['id'] %}active{% endif %}" href="{{ url_for('gallery.index', q=query, kind=media_kind, category=category['id']) }}">
+        {{ category["name"] }} <span>{{ category["media_count"] }}</span>
+      </a>
+    {% endfor %}
+  </section>
+
+  {% if not category_id %}
+    <section class="gallery-category-groups">
+      {% for group in gallery_groups %}
+        <a class="gallery-group-card" href="{{ url_for('gallery.index', q=query, kind=media_kind, category=group['id']) }}">
+          <span class="gallery-group-preview">
+            {% if group["preview_media_kind"] == "image" %}
+              <img src="{{ url_for('gallery.media', media_id=group['preview_media_id']) }}" alt="" loading="lazy" />
+            {% else %}
+              <video muted playsinline preload="metadata" src="{{ url_for('gallery.media', media_id=group['preview_media_id']) }}"></video>
+              <span class="gallery-play">
+                <span class="material-symbols-rounded">play_arrow</span>
+              </span>
+            {% endif %}
+          </span>
+          <span class="gallery-group-body">
+            <strong>{{ group["name"] }}</strong>
+            <small>{{ group["media_count"] }} item{{ "" if group["media_count"] == 1 else "s" }} - {{ group["image_count"] }} photo{{ "" if group["image_count"] == 1 else "s" }} - {{ group["video_count"] }} video{{ "" if group["video_count"] == 1 else "s" }}</small>
+            <em class="not-italic">Latest: {{ group["preview_title"] }}</em>
+          </span>
+        </a>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          No gallery categories with media found.
+        </article>
+      {% endfor %}
+    </section>
+  {% else %}
+    <section class="gallery-grid">
+      {% for media in media_items %}
+        {% set back_url = gallery_return_base ~ '#gallery-media-' ~ media['id'] %}
+        <a
+          class="gallery-card"
+          id="gallery-media-{{ media['id'] }}"
+          href="{{ url_for('gallery.media_view', media_id=media['id'], back=back_url) }}"
+        >
+          <span class="gallery-frame">
+            {% if media["media_kind"] == "image" %}
+              <img src="{{ url_for('gallery.media', media_id=media['id']) }}" alt="" loading="lazy" />
+            {% else %}
+              <video muted playsinline preload="metadata" src="{{ url_for('gallery.media', media_id=media['id']) }}"></video>
+              <span class="gallery-play">
+                <span class="material-symbols-rounded">play_arrow</span>
+              </span>
+            {% endif %}
+            <em>{{ media["category_name"] }}</em>
+          </span>
+          <span class="gallery-caption">
+            <strong>{{ media["title"] }}</strong>
+            <small>{{ (media["event_at"] or media["created_at"]) | chat_timestamp }} by {{ media["uploaded_by_name"] }}</small>
+          </span>
+        </a>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          No gallery media found.
+        </article>
+      {% endfor %}
+    </section>
+
+    {% include "partials/pagination.html" %}
+  {% endif %}
+</section>

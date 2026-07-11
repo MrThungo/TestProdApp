@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Timeline | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="timeline-shell">
+    {% include "partials/flash.html" %}
+
+    <section class="timeline-hero">
+      <div>
+        <p class="mb-2 text-xs font-black uppercase text-btg-gold">Church life</p>
+        <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Timeline</h1>
+        <p class="mt-4 max-w-2xl leading-7 text-btg-muted">
+          Photos, videos, and memories from services, fellowships, and previous church events.
+        </p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <a class="material-button material-button-filled" href="{{ url_for('timeline.index') }}">
+            <span class="material-symbols-rounded text-[20px]">photo_library</span>
+            <span>Timeline</span>
+          </a>
+          <a class="material-button material-button-tonal" href="{{ url_for('timeline.recycle_bin') }}">
+            <span class="material-symbols-rounded text-[20px]">delete</span>
+            <span>Recycle bin{% if deleted_posts %} ({{ deleted_posts }}){% endif %}</span>
+          </a>
+        </div>
+      </div>
+      <form class="search-panel" method="get" action="{{ url_for('timeline.index') }}">
+        <span class="material-symbols-rounded">search</span>
+        <input name="q" value="{{ query }}" autocomplete="off" placeholder="Search timeline" />
+        <button class="material-button material-button-filled" type="submit">Search</button>
+      </form>
+    </section>
+
+    <section class="timeline-composer material-card">
+      <div>
+        <p class="text-xs font-black uppercase text-btg-gold">Share a moment</p>
+        <h2 class="text-2xl font-black">Add event media</h2>
+      </div>
+      <form class="grid gap-4" method="post" action="{{ url_for('timeline.index') }}" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+        <label class="grid gap-2">
+          <span class="text-sm font-bold text-btg-muted">Title</span>
+          <input class="material-field" name="title" maxlength="120" required placeholder="Sunday service, youth night, outreach..." />
+        </label>
+        <label class="grid gap-2">
+          <span class="text-sm font-bold text-btg-muted">Description</span>
+          <textarea class="material-field" name="body" maxlength="900" rows="3" placeholder="Add context, names, or a short testimony."></textarea>
+        </label>
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Event date and time</span>
+            <input class="material-field" name="event_date" type="datetime-local" />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Photos or videos</span>
+            <input class="material-field file:mr-4 file:rounded-md file:border-0 file:bg-btg-green file:px-4 file:py-2 file:font-bold file:text-white" name="media" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/ogg" multiple />
+          </label>
+        </div>
+        {% if g.user["role"] == "videographer" %}
+          <p class="rounded-material bg-btg-green/10 p-3 text-sm font-bold text-btg-green">
+            Videographer video uploads are not blocked by the app video-size limit.
+          </p>
+        {% endif %}
+        <fieldset class="audience-card" data-audience-control>
+          <legend class="text-sm font-bold text-btg-muted">Who can see this post?</legend>
+          <div class="audience-options">
+            <label>
+              <input type="radio" name="visibility" value="everyone" checked data-audience-choice />
+              <span class="material-symbols-rounded">public</span>
+              <strong>Everyone</strong>
+            </label>
+            <label>
+              <input type="radio" name="visibility" value="specific" data-audience-choice />
+              <span class="material-symbols-rounded">lock</span>
+              <strong>Specific people</strong>
+            </label>
+          </div>
+          <div class="audience-picker is-hidden" data-audience-picker>
+            <label class="audience-search">
+              <span class="material-symbols-rounded">search</span>
+              <input type="search" autocomplete="off" placeholder="Look up people" data-audience-search />
+            </label>
+            {% for user in viewer_options %}
+              <label class="audience-user" data-audience-user data-search-text="{{ (user['full_name'] ~ ' ' ~ user['email'] ~ ' ' ~ user['role'])|lower }}">
+                <input type="checkbox" name="viewer_ids" value="{{ user['id'] }}" />
+                {% if user["profile_photo"] %}
+                  <img src="{{ url_for('profile.photo', filename=user['profile_photo']) }}" alt="" />
+                {% else %}
+                  <span>{{ user["full_name"][:1] }}</span>
+                {% endif %}
+                <strong>{{ user["full_name"] }}</strong>
+                <small>{{ user["role"].replace("_", " ") }}</small>
+              </label>
+            {% else %}
+              <p class="text-sm font-bold text-btg-muted">No other active users are available yet.</p>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <button class="material-button material-button-filled w-full" type="submit">
+          <span class="material-symbols-rounded text-[20px]">add_photo_alternate</span>
+          <span>Post to timeline</span>
+        </button>
+      </form>
+    </section>
+
+    {% include "timeline/_feed.html" %}
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

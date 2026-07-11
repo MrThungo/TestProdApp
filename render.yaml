@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: back-to-god-aog
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 180 --access-logfile - --error-logfile -
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENABLE_QUICK_LOGIN
+        value: "0"
+      - key: SESSION_COOKIE_SECURE
+        value: "1"
+      - key: INSTANCE_DIR
+        value: /var/data
+      - key: DATABASE_PATH
+        value: /var/data/back_to_god.sqlite3
+      - key: INITIAL_SUPER_ADMIN_NAME
+        value: Back to God Super Admin
+      - key: INITIAL_SUPER_ADMIN_EMAIL
+        value: superadmin@backtogod.local
+      - key: INITIAL_SUPER_ADMIN_PASSWORD
+        sync: false
+    disk:
+      name: back-to-god-data
+      mountPath: /var/data
+      sizeGB: 1

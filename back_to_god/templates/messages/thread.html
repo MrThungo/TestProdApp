@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Chat | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="chat-shell" data-chat-thread data-chat-user="{{ other_user['id'] }}" data-chat-poll-url="{{ url_for('messages.poll', user_id=other_user['id']) }}" data-chat-send-url="{{ url_for('messages.send', user_id=other_user['id']) }}">
+    <header class="chat-thread-header">
+      <a class="icon-action" href="{{ url_for('messages.index') }}" aria-label="Back">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </a>
+      {% if other_user["profile_photo"] %}
+        <img class="message-avatar" src="{{ url_for('profile.photo', filename=other_user['profile_photo']) }}" alt="" />
+      {% else %}
+        <span class="message-avatar fallback">{{ other_user["full_name"][:1] }}</span>
+      {% endif %}
+      <span class="grid min-w-0">
+        <strong class="truncate">{{ other_user["full_name"] }}</strong>
+        <small class="text-btg-muted" data-chat-presence>{{ presence.label }}</small>
+      </span>
+    </header>
+
+    <section class="chat-messages" data-chat-messages>
+      {% for message in messages %}
+        {% set is_mine = message["sender_id"] == g.user["id"] %}
+        {% set is_deleted = message["deleted_at"] %}
+        {% set has_deletable_attachment = is_mine and message["attachment_id"] and not is_deleted %}
+        <article
+          class="chat-bubble {% if is_mine %}mine{% endif %} {% if is_deleted %}deleted{% endif %}"
+          data-message-id="{{ message['id'] }}"
+          data-message-updated="{{ message['updated_at'] or message['created_at'] }}"
+          data-message-edit-url="{{ url_for('messages.edit', message_id=message['id']) }}"
+          data-message-delete-url="{{ url_for('messages.delete', message_id=message['id']) }}"
+          data-message-can-edit="{{ '1' if is_mine and message['body'] and not is_deleted else '0' }}"
+          data-message-can-delete="{{ '1' if is_mine and not is_deleted else '0' }}"
+          data-attachment-delete-url="{% if has_deletable_attachment %}{{ url_for('messages.delete_attachment', attachment_id=message['attachment_id']) }}{% endif %}"
+          {% if is_mine and not is_deleted %}tabindex="0"{% endif %}
+        >
+          {% if is_deleted %}
+            <p class="chat-deleted-text">Message deleted</p>
+          {% else %}
+            {% if message["attachment_id"] and message["media_kind"] == "image" %}
+              <a class="chat-media-link" href="{{ url_for('messages.attachment_view', attachment_id=message['attachment_id']) }}">
+                <img class="chat-image" src="{{ url_for('messages.attachment', attachment_id=message['attachment_id']) }}" alt="" loading="lazy" />
+              </a>
+            {% elif message["attachment_id"] and message["media_kind"] == "voice" %}
+              <audio class="chat-audio" controls preload="metadata" src="{{ url_for('messages.attachment', attachment_id=message['attachment_id']) }}"></audio>
+              <a class="chat-attachment-link" href="{{ url_for('messages.attachment_view', attachment_id=message['attachment_id']) }}">Open voice note</a>
+            {% elif message["attachment_id"] and message["media_kind"] == "video" %}
+              <a class="chat-attachment-link" href="{{ url_for('messages.attachment_view', attachment_id=message['attachment_id']) }}">
+                <span class="material-symbols-rounded">play_circle</span>
+                <span>Open video</span>
+              </a>
+            {% elif message["attachment_id"] and message["media_kind"] == "file" %}
+              <a class="chat-attachment-link" href="{{ url_for('messages.attachment_view', attachment_id=message['attachment_id']) }}">
+                <span class="material-symbols-rounded">attach_file</span>
+                <span>{{ message["original_name"] or "Open attachment" }}</span>
+              </a>
+            {% endif %}
+            {% if message["body"] %}
+              <p data-message-body>{{ message["body"] }}</p>
+            {% endif %}
+          {% endif %}
+          <small>
+            <span data-message-time>{{ message["created_at"] | chat_timestamp }}</span>
+            {% if message["edited_at"] and not is_deleted %}
+              <span data-message-edited>edited</span>
+            {% endif %}
+          </small>
+        </article>
+      {% endfor %}
+    </section>
+    <div class="chat-action-popover hidden" data-chat-action-popover role="menu" aria-hidden="true"></div>
+
+    <form class="chat-compose" data-chat-form enctype="multipart/form-data">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+      <input class="hidden" type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" data-chat-image-input />
+      <input class="hidden" type="file" name="video" accept="video/mp4,video/webm,video/ogg" data-chat-video-input />
+      <input class="hidden" type="file" name="attachment" accept="application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-chat-file-input />
+      <button class="chat-icon-button" type="button" data-chat-image-button aria-label="Send picture" title="Send picture">
+        <span class="material-symbols-rounded">image</span>
+      </button>
+      <button class="chat-icon-button" type="button" data-chat-video-button aria-label="Send video" title="Send video">
+        <span class="material-symbols-rounded">movie</span>
+      </button>
+      <button class="chat-icon-button" type="button" data-chat-file-button aria-label="Send attachment" title="Send attachment">
+        <span class="material-symbols-rounded">attach_file</span>
+      </button>
+      <input class="material-field" name="body" autocomplete="off" maxlength="900" placeholder="Message" />
+      <button class="chat-icon-button" type="button" data-chat-voice-button aria-label="Record voice note" title="Record voice note">
+        <span class="material-symbols-rounded">mic</span>
+      </button>
+      <button class="chat-icon-button hidden" type="button" data-chat-voice-cancel aria-label="Cancel voice note" title="Cancel voice note">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+      <button class="material-button material-button-filled" type="submit" aria-label="Send" title="Send">
+        <span class="material-symbols-rounded text-[20px]">send</span>
+      </button>
+      <small class="chat-recording-status hidden" data-chat-voice-status>Recording... tap mic to send or X to cancel.</small>
+    </form>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

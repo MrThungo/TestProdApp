@@ -1,0 +1,32 @@
+{% if pagination and pagination.pages > 1 %}
+  <nav class="pagination-bar" aria-label="Pagination">
+    <span>
+      Showing {{ pagination.start }}-{{ pagination.end }} of {{ pagination.total }}
+    </span>
+    <div>
+      {% if pagination.has_prev %}
+        <a class="pagination-button" href="{{ page_url(pagination.prev_page, pagination_endpoint|default(None)) }}">
+          <span class="material-symbols-rounded">chevron_left</span>
+          <span>Previous</span>
+        </a>
+      {% else %}
+        <span class="pagination-button disabled">
+          <span class="material-symbols-rounded">chevron_left</span>
+          <span>Previous</span>
+        </span>
+      {% endif %}
+      <strong>{{ pagination.page }} / {{ pagination.pages }}</strong>
+      {% if pagination.has_next %}
+        <a class="pagination-button" href="{{ page_url(pagination.next_page, pagination_endpoint|default(None)) }}">
+          <span>Next</span>
+          <span class="material-symbols-rounded">chevron_right</span>
+        </a>
+      {% else %}
+        <span class="pagination-button disabled">
+          <span>Next</span>
+          <span class="material-symbols-rounded">chevron_right</span>
+        </span>
+      {% endif %}
+    </div>
+  </nav>
+{% endif %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Search | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[960px] gap-6 pb-28 pt-6">
+    <section>
+      <p class="mb-1 text-xs font-black uppercase text-btg-gold">Find</p>
+      <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Search</h1>
+      <form class="search-panel mt-5" method="get" action="{{ url_for('search.index') }}">
+        <span class="material-symbols-rounded">search</span>
+        <input name="q" value="{{ query }}" autocomplete="off" autofocus placeholder="Search videos, timeline posts, descriptions" />
+        <button class="material-button material-button-filled" type="submit">Search</button>
+      </form>
+    </section>
+
+    {% if query %}
+      <section class="grid gap-3">
+        <p class="text-xs font-black uppercase text-btg-gold">Live recordings</p>
+        {% for live in recordings %}
+          <a class="material-card grid gap-2 p-4 no-underline" href="{{ url_for('live.recording', live_id=live['id']) }}">
+            <strong>{{ live["title"] }}</strong>
+            <span class="text-sm text-btg-muted">{{ live["started_at"] | chat_timestamp }} by {{ live["streamer_name"] }}</span>
+            <span class="line-clamp-2 text-btg-muted">{{ live["description"] or "Saved live recording" }}</span>
+          </a>
+        {% else %}
+          <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-4 text-center text-btg-muted">
+            No recordings matched.
+          </article>
+        {% endfor %}
+      </section>
+
+      <section class="grid gap-3">
+        <p class="text-xs font-black uppercase text-btg-gold">Timeline</p>
+        {% for post in timeline_posts %}
+          <a class="material-card grid gap-2 p-4 no-underline" href="{{ url_for('timeline.index', q=query) }}">
+            <strong>{{ post["title"] }}</strong>
+            <span class="text-sm text-btg-muted">{{ (post["event_date"] or post["created_at"]) | chat_timestamp }} by {{ post["author_name"] }}</span>
+            <span class="line-clamp-2 text-btg-muted">{{ post["body"] or "Timeline post" }}</span>
+          </a>
+        {% else %}
+          <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-4 text-center text-btg-muted">
+            No timeline posts matched.
+          </article>
+        {% endfor %}
+      </section>
+    {% else %}
+      <article class="material-card grid gap-2 p-5">
+        <span class="material-symbols-rounded text-btg-green">manage_search</span>
+        <strong>Search church media</strong>
+        <p class="text-btg-muted">Find saved live videos and timeline posts by title, description, or person.</p>
+      </article>
+    {% endif %}
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

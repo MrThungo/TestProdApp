@@ -1,0 +1,83 @@
+<header class="app-topbar">
+  <a class="app-brand" href="{{ url_for('dashboard.index') }}" aria-label="Back to dashboard">
+    {% if g.user and g.user["profile_photo"] %}
+      <img class="app-brand-avatar" src="{{ url_for('profile.photo', filename=g.user['profile_photo']) }}" alt="" />
+    {% else %}
+      <span class="app-brand-mark">{{ (g.user["full_name"][:1] if g.user else "B") }}</span>
+    {% endif %}
+    <span class="app-brand-copy">
+      <strong>Back to God AOG</strong>
+      <small>{{ g.user["full_name"] if g.user else "City Centre" }}</small>
+    </span>
+  </a>
+
+  <nav class="app-topbar-actions" aria-label="Quick actions">
+    {% include "partials/theme_toggle.html" %}
+    <a class="icon-action" href="{{ url_for('search.index') }}" aria-label="Search" title="Search">
+      <span class="material-symbols-rounded text-[20px]">search</span>
+    </a>
+    <a class="icon-action" href="{{ url_for('notifications.index') }}" aria-label="Notifications" title="Notifications">
+      <span class="material-symbols-rounded text-[20px]">notifications</span>
+      {% if g.unread_notifications %}
+        <span class="notification-dot" data-notification-count>{{ g.unread_notifications }}</span>
+      {% else %}
+        <span class="notification-dot hidden" data-notification-count>0</span>
+      {% endif %}
+    </a>
+
+    <details class="app-menu">
+      <summary class="icon-action" aria-label="Open menu" title="Menu">
+        <span class="material-symbols-rounded text-[22px]">menu</span>
+      </summary>
+      <div class="app-menu-panel">
+        <span class="app-menu-heading">Navigate</span>
+        <a href="{{ url_for('dashboard.index') }}">
+          <span class="material-symbols-rounded">home</span>
+          <strong>Home</strong>
+        </a>
+        {% if g.user["role"] in ["super_admin", "admin", "pastor"] %}
+          <a href="{{ url_for('users.index') }}">
+            <span class="material-symbols-rounded">groups</span>
+            <strong>Users</strong>
+          </a>
+        {% endif %}
+        {% if g.user["role"] in ["super_admin", "admin", "pastor", "usher"] %}
+          <a href="{{ url_for('visitors.index') }}">
+            <span class="material-symbols-rounded">diversity_3</span>
+            <strong>Visitors</strong>
+          </a>
+        {% endif %}
+        <a href="{{ url_for('gallery.index') }}">
+          <span class="material-symbols-rounded">collections</span>
+          <strong>Gallery</strong>
+        </a>
+        <a href="{{ url_for('announcements.index') }}">
+          <span class="material-symbols-rounded">campaign</span>
+          <strong>News</strong>
+        </a>
+        {% if g.show_finance_tab %}
+          <a href="{{ url_for('finance.index') }}">
+            <span class="material-symbols-rounded">account_balance</span>
+            <strong>Finance</strong>
+          </a>
+        {% endif %}
+        <a href="{{ url_for('messages.index') }}">
+          <span class="material-symbols-rounded">chat_bubble</span>
+          <strong>Messages</strong>
+          <em class="{% if not g.unread_messages %}hidden{% endif %}" data-message-count>{{ g.unread_messages or 0 }}</em>
+        </a>
+        <a href="{{ url_for('profile.edit') }}">
+          <span class="material-symbols-rounded">account_circle</span>
+          <strong>Profile</strong>
+        </a>
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <button type="submit">
+            <span class="material-symbols-rounded">logout</span>
+            <strong>Sign out</strong>
+          </button>
+        </form>
+      </div>
+    </details>
+  </nav>
+</header>

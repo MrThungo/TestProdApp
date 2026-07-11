@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Create account | Back to God AOG{% endblock %}
+
+{% block page %}
+  <main class="auth-shell min-h-screen">
+    <section class="auth-brand-panel">
+      <div class="flex items-center justify-between gap-3">
+        <a class="flex items-center gap-3 no-underline" href="{{ url_for('public.landing') }}">
+          <span class="landing-logo-small">
+            <img src="{{ url_for('static', filename='images/brand/city-centre-logo.png') }}" alt="City Centre Assemblies of God logo" />
+          </span>
+          <span>
+            <strong class="block">Back to God AOG</strong>
+            <small class="block text-xs text-white/70">Member access</small>
+          </span>
+        </a>
+        {% include "partials/theme_toggle.html" %}
+      </div>
+      <div class="auth-brand-copy">
+        <span class="auth-kicker">Join the app</span>
+        <h1>Create your account.</h1>
+        <p>Your first password is generated automatically. On first login, you will be required to set your own password.</p>
+      </div>
+    </section>
+
+    <section class="auth-form-panel">
+      {% include "partials/flash.html" %}
+      <form class="auth-card" method="post" action="{{ url_for('auth.signup') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+        <div>
+          <p class="text-xs font-black uppercase text-btg-gold">Member</p>
+          <h2 class="mt-1 text-3xl font-black">Signup</h2>
+          <p class="mt-2 text-sm font-semibold text-btg-muted">Your temporary password will be emailed to you.</p>
+        </div>
+        <label class="grid gap-2">
+          <span class="text-sm font-bold text-btg-muted">Full name</span>
+          <input class="material-field" name="full_name" autocomplete="name" required />
+        </label>
+        <label class="grid gap-2">
+          <span class="text-sm font-bold text-btg-muted">Email</span>
+          <input class="material-field" name="email" type="email" autocomplete="email" required />
+        </label>
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Phone / WhatsApp</span>
+            <input class="material-field" name="phone" autocomplete="tel" />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Home area</span>
+            <input class="material-field" name="home_area" />
+          </label>
+        </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Identity type</span>
+              <select class="material-field" name="identity_type" data-identity-type>
+                <option value="sa_id">South African ID</option>
+                <option value="foreign">Foreign national</option>
+              </select>
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">SA ID number</span>
+              <input class="material-field" name="id_number" inputmode="numeric" maxlength="13" data-id-number data-dob-target="#signup_date_of_birth" data-age-target="#signup_age" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Passport / permit number</span>
+              <input class="material-field" name="foreign_id_number" autocomplete="off" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Nationality</span>
+              <input class="material-field" name="nationality" autocomplete="country-name" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Date of birth</span>
+              <input class="material-field" id="signup_date_of_birth" name="date_of_birth" type="date" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Age</span>
+              <input class="material-field" id="signup_age" value="Not added" readonly />
+            </label>
+          </div>
+        <button class="material-button material-button-filled w-full" type="submit">
+          <span class="material-symbols-rounded text-[20px]">person_add</span>
+          <span>Create account</span>
+        </button>
+        <a class="material-button material-button-tonal w-full" href="{{ url_for('auth.login') }}">Back to sign in</a>
+      </form>
+    </section>
+  </main>
+{% endblock %}

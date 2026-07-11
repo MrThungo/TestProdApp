@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1120px] gap-6 pb-28 pt-6">
+    {% include "partials/flash.html" %}
+
+    <section class="dashboard-hero">
+      <div>
+        <p class="mb-2 text-xs font-black uppercase text-btg-gold">{{ role_labels[g.user["role"]] }}</p>
+        <h1>Hello, {{ g.user["full_name"] }}</h1>
+        <p>{{ role_descriptions[g.user["role"]] }}</p>
+      </div>
+      <div class="dashboard-hero-actions">
+        <a class="material-button material-button-filled" href="{{ url_for('messages.index') }}">
+          <span class="material-symbols-rounded text-[20px]">chat_bubble</span>
+          <span>Messages</span>
+        </a>
+        <a class="material-button material-button-ghost" href="{{ url_for('live.index') }}">
+          <span class="material-symbols-rounded text-[20px]">live_tv</span>
+          <span>Live</span>
+        </a>
+      </div>
+    </section>
+
+    {% if show_user_counts or show_visitor_counts or can_manage_finance %}
+      <section class="dashboard-grid">
+        {% if show_user_counts %}
+          <article class="metric-card">
+            <span class="material-symbols-rounded">verified_user</span>
+            <strong>{{ counts.active }}</strong>
+            <small>Active users</small>
+          </article>
+          <article class="metric-card">
+            <span class="material-symbols-rounded">church</span>
+            <strong>{{ counts.pastors }}</strong>
+            <small>Pastors</small>
+          </article>
+          <article class="metric-card">
+            <span class="material-symbols-rounded">groups</span>
+            <strong>{{ counts.members }}</strong>
+            <small>Members</small>
+          </article>
+        {% endif %}
+        {% if show_visitor_counts %}
+          <article class="metric-card">
+            <span class="material-symbols-rounded">diversity_3</span>
+            <strong>{{ counts.visitors }}</strong>
+            <small>Visitors</small>
+          </article>
+          <article class="metric-card">
+            <span class="material-symbols-rounded">phone_in_talk</span>
+            <strong>{{ counts.visitor_followups }}</strong>
+            <small>Open follow-ups</small>
+          </article>
+        {% endif %}
+        <article class="metric-card">
+          <span class="material-symbols-rounded">live_tv</span>
+          <strong>{{ counts.live_now }}</strong>
+          <small>Live now</small>
+        </article>
+        {% if can_manage_finance and finance_summary %}
+          <article class="metric-card">
+            <span class="material-symbols-rounded">payments</span>
+            <strong>{{ finance_summary.total_money }}</strong>
+            <small>Deposits captured</small>
+          </article>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if show_user_counts or can_manage_finance %}
+      <section class="analytics-grid">
+        {% if show_user_counts %}
+          <article class="chart-panel">
+            <div>
+              <p class="text-xs font-black uppercase text-btg-gold">People</p>
+              <h2 class="text-2xl font-black">Role distribution</h2>
+            </div>
+            <div class="insight-bars" style="--max-value: {{ counts.active or 1 }}">
+              {% for value, label in [
+                (counts.pastors, "Pastors"),
+                (counts.ushers, "Ushers"),
+                (counts.videographers, "Media"),
+                (counts.treasurers, "Treasury"),
+                (counts.members, "Members")
+              ] %}
+                <span style="--value: {{ value or 0 }}">
+                  <strong>{{ label }}</strong>
+                  <i></i>
+                  <em>{{ value }}</em>
+                </span>
+              {% endfor %}
+            </div>
+          </article>
+        {% endif %}
+        {% if can_manage_finance and finance_summary %}
+          <article class="chart-panel">
+            <div>
+              <p class="text-xs font-black uppercase text-btg-gold">Treasury</p>
+              <h2 class="text-2xl font-black">Deposit trend</h2>
+            </div>
+            <div class="bar-chart" style="--max-value: {{ finance_summary.max_monthly_cents or 1 }}">
+              {% for month in finance_summary.monthly %}
+                <span class="bar-chart-item" style="--value: {{ month['cents'] or 1 }}">
+                  <i></i>
+                  <small>{{ month["month"] }}</small>
+                </span>
+              {% else %}
+                <p class="text-btg-muted">No deposit data yet.</p>
+              {% endfor %}
+            </div>
+          </article>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if show_visitor_counts and visitor_analytics %}
+      <section class="analytics-grid">
+        <article class="chart-panel advanced-chart-panel">
+          <div>
+            <p class="text-xs font-black uppercase text-btg-gold">Hospitality trend</p>
+            <h2 class="text-2xl font-black">Visitors by month</h2>
+          </div>
+          <div class="bar-chart advanced-bars" style="--max-value: {{ visitor_analytics.max_monthly or 1 }}">
+            {% for month in visitor_analytics.monthly %}
+              <span class="bar-chart-item" style="--value: {{ month['count'] or 1 }}">
+                <i></i>
+                <small>{{ month["month"] }}</small>
+              </span>
+            {% else %}
+              <p class="text-btg-muted">No visitor trend data yet.</p>
+            {% endfor %}
+          </div>
+        </article>
+        <article class="chart-panel advanced-chart-panel">
+          <div>
+            <p class="text-xs font-black uppercase text-btg-gold">Follow-up health</p>
+            <h2 class="text-2xl font-black">Visitor status</h2>
+          </div>
+          <div class="insight-bars" style="--max-value: {{ visitor_analytics.max_status or 1 }}">
+            {% for item in visitor_analytics.status %}
+              <span style="--value: {{ item['count'] or 0 }}">
+                <strong>{{ item["label"].replace("_", " ").title() }}</strong>
+                <i></i>
+                <em>{{ item["count"] }}</em>
+              </span>
+            {% endfor %}
+          </div>
+        </article>
+        <article class="chart-panel advanced-chart-panel">
+          <div>
+            <p class="text-xs font-black uppercase text-btg-gold">Identity coverage</p>
+            <h2 class="text-2xl font-black">Local and foreign visitors</h2>
+          </div>
+          <div class="insight-bars" style="--max-value: {{ visitor_analytics.max_identity or 1 }}">
+            {% for item in visitor_analytics.identity %}
+              <span style="--value: {{ item['count'] or 0 }}">
+                <strong>{{ "Foreign national" if item["label"] == "foreign" else "South African ID" }}</strong>
+                <i></i>
+                <em>{{ item["count"] }}</em>
+              </span>
+            {% endfor %}
+          </div>
+        </article>
+      </section>
+    {% endif %}
+
+    <section class="grid gap-4">
+      <div>
+        <p class="mb-1 text-xs font-black uppercase text-btg-gold">Today</p>
+        <h2 class="text-2xl font-black">{{ "Control room" if show_user_counts or show_visitor_counts or can_manage_finance else "Church life" }}</h2>
+      </div>
+      <div class="grid gap-3 md:grid-cols-3">
+        {% if can_capture_visitors %}
+          <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('visitors.index') }}">
+            <span class="material-symbols-rounded text-btg-green">person_add</span>
+            <span class="text-xs font-black uppercase text-btg-gold">Hospitality</span>
+            <strong>Capture visitors</strong>
+            <small class="text-btg-muted">{{ counts.visitor_followups }} open follow-ups</small>
+          </a>
+        {% endif %}
+        <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('messages.index') }}">
+          <span class="material-symbols-rounded text-btg-green">chat_bubble</span>
+          <span class="text-xs font-black uppercase text-btg-gold">Communication</span>
+          <strong>Messages</strong>
+          <small class="text-btg-muted">Chat, photos, and voice notes</small>
+        </a>
+        <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('live.index') }}">
+          <span class="material-symbols-rounded text-btg-green">live_tv</span>
+          <span class="text-xs font-black uppercase text-btg-gold">Live</span>
+          <strong>{{ "Go live" if can_start_live else "Watch live" }}</strong>
+          <small class="text-btg-muted">{{ counts.live_now }} active sessions</small>
+        </a>
+        <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('timeline.index') }}">
+          <span class="material-symbols-rounded text-btg-green">photo_library</span>
+          <span class="text-xs font-black uppercase text-btg-gold">Events</span>
+          <strong>Timeline</strong>
+          <small class="text-btg-muted">Photos, videos, and comments</small>
+        </a>
+        <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('timeline.recycle_bin') }}">
+          <span class="material-symbols-rounded text-btg-green">delete</span>
+          <span class="text-xs font-black uppercase text-btg-gold">Recovery</span>
+          <strong>Recycle bin</strong>
+          <small class="text-btg-muted">{{ deleted_timeline_posts }} deleted timeline posts</small>
+        </a>
+        <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('gallery.index') }}">
+          <span class="material-symbols-rounded text-btg-green">collections</span>
+          <span class="text-xs font-black uppercase text-btg-gold">Media</span>
+          <strong>Gallery</strong>
+          <small class="text-btg-muted">Browse photos and videos</small>
+        </a>
+        <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('announcements.index') }}">
+          <span class="material-symbols-rounded text-btg-green">campaign</span>
+          <span class="text-xs font-black uppercase text-btg-gold">Church board</span>
+          <strong>{{ "Post announcements" if can_post_announcements else "Announcements" }}</strong>
+          <small class="text-btg-muted">Important notices for everyone</small>
+        </a>
+        {% if g.show_finance_tab %}
+          <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('finance.index') }}">
+            <span class="material-symbols-rounded text-btg-green">account_balance</span>
+            <span class="text-xs font-black uppercase text-btg-gold">Finance</span>
+            <strong>{{ "Manage slips" if can_manage_finance else "Visible slips" }}</strong>
+            <small class="text-btg-muted">{{ visible_slips | length }} visible now</small>
+          </a>
+        {% endif %}
+        {% if can_manage %}
+          <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('users.index') }}">
+            <span class="material-symbols-rounded text-btg-green">admin_panel_settings</span>
+            <span class="text-xs font-black uppercase text-btg-gold">Access</span>
+            <strong>Manage users</strong>
+            <small class="text-btg-muted">Auto-generated passwords</small>
+          </a>
+        {% endif %}
+        {% if g.user["role"] == "super_admin" %}
+          <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('audit.index') }}">
+            <span class="material-symbols-rounded text-btg-green">manage_search</span>
+            <span class="text-xs font-black uppercase text-btg-gold">Super admin</span>
+            <strong>Activity trail</strong>
+            <small class="text-btg-muted">See what happens in the app</small>
+          </a>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if visible_slips %}
+      <section class="grid gap-3">
+        <p class="text-xs font-black uppercase text-btg-gold">Visible deposit slips</p>
+        {% for slip in visible_slips %}
+          <a class="material-card flex items-center justify-between gap-3 p-4 no-underline" href="{{ url_for('finance.view_slip', slip_id=slip['id']) }}">
+            <span class="grid min-w-0 gap-1">
+              <strong class="truncate">{{ slip["title"] }}</strong>
+              <small class="truncate text-btg-muted">Visible until {{ slip["visible_until"] | pretty_date }}</small>
+            </span>
+            <span class="material-symbols-rounded text-btg-green">receipt_long</span>
+          </a>
+        {% endfor %}
+      </section>
+    {% endif %}
+
+    {% if active_live_sessions %}
+      <section class="grid gap-3">
+        <p class="text-xs font-black uppercase text-btg-gold">Live now</p>
+        {% for live in active_live_sessions %}
+          <a class="material-card flex items-center justify-between gap-3 p-4 no-underline" href="{{ url_for('live.watch', live_id=live['id']) }}">
+            <span class="grid min-w-0 gap-1">
+              <strong class="truncate">{{ live["title"] }}</strong>
+              <small class="truncate text-btg-muted">Started by {{ live["streamer_name"] }}</small>
+            </span>
+            <em class="live-chip">Live</em>
+          </a>
+        {% endfor %}
+      </section>
+    {% endif %}
+
+    {% if recent_announcements %}
+      <section class="grid gap-3">
+        <p class="text-xs font-black uppercase text-btg-gold">Announcements</p>
+        {% for announcement in recent_announcements %}
+          <a class="material-card flex items-center justify-between gap-3 p-4 no-underline" href="{{ url_for('announcements.index', _anchor='announcement-' ~ announcement['id']) }}">
+            <span class="grid min-w-0 gap-1">
+              <strong class="truncate">{{ announcement["title"] }}</strong>
+              <small class="truncate text-btg-muted">{{ announcement["created_at"] | pretty_date }} by {{ announcement["author_name"] }}</small>
+            </span>
+            <span class="material-symbols-rounded text-btg-green">campaign</span>
+          </a>
+        {% endfor %}
+      </section>
+    {% endif %}
+
+    {% if can_manage and recent_users %}
+      <section class="grid gap-3">
+        <p class="text-xs font-black uppercase text-btg-gold">Recent accounts</p>
+        {% for user in recent_users %}
+          <article class="material-card flex items-center justify-between gap-3 p-4">
+            <span class="grid min-w-0 gap-1">
+              <strong class="truncate">{{ user["full_name"] }}</strong>
+              <small class="truncate text-btg-muted">{{ user["email"] }}</small>
+            </span>
+            <em class="material-chip not-italic">{{ role_labels[user["role"]] }}</em>
+          </article>
+        {% endfor %}
+      </section>
+    {% endif %}
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

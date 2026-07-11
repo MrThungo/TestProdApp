@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Live studio | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1080px] gap-6 pb-28 pt-6">
+    {% include "partials/flash.html" %}
+
+    <section
+      class="live-room"
+      data-live-studio
+      data-live-id="{{ live['id'] }}"
+      data-signal-url="{{ url_for('live.signal', live_id=live['id']) }}"
+      data-signals-url="{{ url_for('live.signals', live_id=live['id']) }}"
+      data-record-url="{{ url_for('live.recording_upload', live_id=live['id']) }}"
+      data-engagement-url="{{ url_for('live.engagement', live_id=live['id']) }}"
+    >
+      <div class="live-video-frame">
+        <video data-live-local autoplay muted playsinline></video>
+        <div class="live-empty-state" data-live-empty>
+          <span class="material-symbols-rounded">videocam</span>
+          <strong>Camera preview</strong>
+        </div>
+      </div>
+      <aside class="material-card grid gap-4 p-4">
+        <p class="text-xs font-black uppercase text-btg-gold">Studio</p>
+        <h1 class="text-3xl font-black">{{ live["title"] }}</h1>
+        <p class="leading-7 text-btg-muted">{{ live["description"] or "Members will see this live session in the app." }}</p>
+        <button class="material-button material-button-filled w-full" type="button" data-live-start-camera>
+          <span class="material-symbols-rounded text-[20px]">videocam</span>
+          <span>Start camera</span>
+        </button>
+        <p class="live-recording-status" data-live-recording-status>Recording starts when the camera starts.</p>
+        {% if live["recording_available"] %}
+          <a class="material-button material-button-tonal w-full" href="{{ url_for('live.recording_view', live_id=live['id'], back=url_for('live.studio', live_id=live['id'])) }}">
+            <span class="material-symbols-rounded text-[20px]">movie</span>
+            <span>View saved recording</span>
+          </a>
+        {% endif %}
+        <a class="material-button material-button-tonal w-full" href="{{ url_for('live.watch', live_id=live['id']) }}">
+          <span class="material-symbols-rounded text-[20px]">visibility</span>
+          <span>Open watch page</span>
+        </a>
+        <form method="post" action="{{ url_for('live.end', live_id=live['id']) }}" data-live-end-form>
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <button class="material-button material-button-tonal danger-action w-full" type="submit">
+            <span class="material-symbols-rounded text-[20px]">stop_circle</span>
+            <span>End live</span>
+          </button>
+        </form>
+        <small class="text-btg-muted">For best results, keep this studio tab open while members watch. The live recording is compressed in the browser, then saved as one database video when the live ends.</small>
+      </aside>
+    </section>
+
+    <section class="live-engagement" data-live-engagement>
+      <div class="reaction-strip">
+        {% for key, icon, label in [
+          ("like", "thumb_up", "Like"),
+          ("heart", "favorite", "Love"),
+          ("amen", "volunteer_activism", "Amen"),
+          ("clap", "front_hand", "Clap"),
+          ("fire", "local_fire_department", "Fire")
+        ] %}
+          <span class="reaction-button readonly" aria-label="{{ label }}">
+            <span class="material-symbols-rounded">{{ icon }}</span>
+            <strong data-reaction-count="{{ key }}">{{ reactions.get(key, 0) }}</strong>
+          </span>
+        {% endfor %}
+      </div>
+      <div class="live-comments-panel">
+        <div>
+          <p class="text-xs font-black uppercase text-btg-gold">Live monitor</p>
+          <h2 class="text-2xl font-black">Comments</h2>
+        </div>
+        <div class="live-comments" data-live-comments>
+          {% for comment in comments %}
+            <article class="live-comment" data-live-comment-id="{{ comment['id'] }}">
+              <strong>{{ comment["full_name"] }}</strong>
+              <p>{{ comment["body"] }}</p>
+            </article>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

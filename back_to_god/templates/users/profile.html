@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}User Profile | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[880px] gap-6 pb-28 pt-6">
+    {% include "partials/flash.html" %}
+    <section class="media-viewer-header">
+      <a class="icon-action" href="{{ request.referrer or url_for('users.index') }}" aria-label="Back">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </a>
+      <span class="grid min-w-0">
+        <strong>{{ user["full_name"] }}</strong>
+        <small class="text-btg-muted">{{ user["email"] }}</small>
+      </span>
+      <em class="material-chip not-italic">{{ role_labels[user["role"]] }}</em>
+    </section>
+
+    <section class="material-card profile-card overflow-hidden">
+      <div class="cinematic-backdrop h-32"></div>
+      <div class="-mt-14 grid gap-4 p-4">
+        <div class="profile-summary">
+          <div class="profile-photo-shell">
+            {% if user["profile_photo"] %}
+              <img class="profile-photo" src="{{ url_for('profile.photo', filename=user['profile_photo']) }}" alt="" />
+            {% else %}
+              <div class="profile-photo profile-photo-fallback">{{ user["full_name"][:1] }}</div>
+            {% endif %}
+          </div>
+          <div class="profile-summary-copy">
+            <strong class="block text-xl">{{ user["full_name"] }}</strong>
+            <span class="text-sm text-btg-muted">{{ user["email"] }}</span>
+          </div>
+        </div>
+
+        <dl class="profile-detail-grid">
+          <div><dt>Role</dt><dd>{{ role_labels[user["role"]] }}</dd></div>
+          <div><dt>Status</dt><dd>{{ "Active" if user["is_active"] else "Inactive" }}</dd></div>
+          <div><dt>Password</dt><dd>{{ "Must change" if user["must_change_password"] else "Set" }}</dd></div>
+          <div><dt>Phone</dt><dd>{{ user["phone"] or "Not added" }}</dd></div>
+          <div><dt>Home area</dt><dd>{{ user["home_area"] or "Not added" }}</dd></div>
+          <div><dt>Identity</dt><dd>{{ "Foreign national" if user["identity_type"] == "foreign" else "South African ID" }}</dd></div>
+          <div><dt>ID / passport</dt><dd>{{ user["foreign_id_number"] if user["identity_type"] == "foreign" else (user["id_number"] or "Not added") }}</dd></div>
+          <div><dt>Nationality</dt><dd>{{ user["nationality"] or "Not added" }}</dd></div>
+          <div><dt>Date of birth</dt><dd>{{ user["date_of_birth"] or "Not added" }}</dd></div>
+          {% if can_see_age %}
+            <div><dt>Age</dt><dd>{{ user["date_of_birth"] | age_from_dob }}</dd></div>
+          {% endif %}
+          <div><dt>Emergency contact</dt><dd>{{ user["emergency_contact_name"] or "Not added" }}</dd></div>
+          <div><dt>Emergency phone</dt><dd>{{ user["emergency_contact_phone"] or "Not added" }}</dd></div>
+          <div><dt>Relationship</dt><dd>{{ user["emergency_contact_relationship"] or "Not added" }}</dd></div>
+          <div><dt>Created</dt><dd>{{ user["created_at"] | pretty_date }}</dd></div>
+          <div><dt>Last login</dt><dd>{{ user["last_login_at"] | pretty_date }}</dd></div>
+          <div><dt>Last seen</dt><dd>{{ user["last_seen_at"] | pretty_date }}</dd></div>
+        </dl>
+        {% if user["bio"] %}
+          <p class="leading-7 text-btg-muted">{{ user["bio"] }}</p>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}{{ code }} | Back to God AOG{% endblock %}
+
+{% block page %}
+  <main class="error-shell">
+    <section class="error-card" aria-labelledby="error-title">
+      <div class="error-rings" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <header class="error-header">
+        <a class="error-brand" href="{{ home_url | default(url_for('public.landing')) }}" aria-label="Back to God AOG home">
+          <span>
+            <img src="{{ url_for('static', filename='images/brand/city-centre-logo.png') }}" alt="" />
+          </span>
+          <strong>Back to God AOG</strong>
+        </a>
+        {% include "partials/theme_toggle.html" %}
+      </header>
+      <span class="error-code" aria-label="Error {{ code }}">{{ code }}</span>
+      <div>
+        <p class="error-kicker">City Centre</p>
+        <h1 id="error-title">{{ title }}</h1>
+        <p>{{ message }}</p>
+      </div>
+      <div class="error-actions">
+        <button class="material-button material-button-tonal" type="button" data-safe-back data-fallback-url="{{ home_url | default(url_for('public.landing')) }}">
+          <span class="material-symbols-rounded text-[20px]">arrow_back</span>
+          <span>Back</span>
+        </button>
+        <a class="material-button material-button-filled" href="{{ home_url | default(url_for('public.landing')) }}">
+          <span class="material-symbols-rounded text-[20px]">home</span>
+          <span>Home</span>
+        </a>
+      </div>
+    </section>
+  </main>
+{% endblock %}

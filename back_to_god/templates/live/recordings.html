@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Live Recordings | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1080px] gap-6 pb-28 pt-6">
+    <section class="material-card live-archive-hero p-5">
+      <a class="material-button material-button-tonal w-fit" href="{{ request.referrer or url_for('live.index') }}">
+        <span class="material-symbols-rounded text-[20px]">arrow_back</span>
+        <span>Back</span>
+      </a>
+      <div>
+        <p class="mb-2 text-xs font-black uppercase text-btg-gold">Saved live videos</p>
+        <h1 class="text-[clamp(2.4rem,11vw,4.8rem)] font-black leading-none">Recordings</h1>
+        <p class="mt-4 max-w-2xl leading-7 text-btg-muted">
+          Watch services and moments after the live has ended. Search by title, description, or streamer.
+        </p>
+      </div>
+      <form class="search-panel" method="get" action="{{ url_for('live.recordings') }}">
+        <span class="material-symbols-rounded">search</span>
+        <input name="q" value="{{ query }}" autocomplete="off" placeholder="Search recordings" />
+        <button class="material-button material-button-filled" type="submit">Search</button>
+      </form>
+    </section>
+
+    <section class="recording-grid">
+      {% for live in recordings %}
+        <article class="recording-card">
+          <a class="recording-thumb" href="{{ url_for('live.recording_view', live_id=live['id'], back=url_for('live.recordings', q=query, page=pagination.page)) }}">
+            <video preload="metadata" muted src="{{ url_for('live.recording', live_id=live['id']) }}"></video>
+            <span class="material-symbols-rounded">play_arrow</span>
+          </a>
+          <div class="grid gap-2 p-4">
+            <span class="flex flex-wrap items-center gap-2 text-xs font-black uppercase text-btg-gold">
+              <span>{{ live["started_at"] | chat_timestamp }}</span>
+              {% if live["ended_at"] %}
+                <span>Ended {{ live["ended_at"] | chat_timestamp }}</span>
+              {% endif %}
+            </span>
+            <h2 class="text-xl font-black">{{ live["title"] }}</h2>
+            <p class="leading-7 text-btg-muted">{{ live["description"] or "Recorded live from Back to God AOG City Centre." }}</p>
+            <small class="text-btg-muted">Recorded by {{ live["streamer_name"] }} - {{ live["recording_bytes"] | bits_size }}</small>
+            <a class="material-button material-button-filled w-full" href="{{ url_for('live.recording_view', live_id=live['id'], back=url_for('live.recordings', q=query, page=pagination.page)) }}">
+              <span class="material-symbols-rounded text-[20px]">movie</span>
+              <span>Watch recording</span>
+            </a>
+            {% if g.user["id"] == live["started_by"] or g.user["role"] in ["super_admin", "admin"] %}
+              <form method="post" action="{{ url_for('live.delete_recording', live_id=live['id']) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <button class="material-button material-button-tonal danger-action w-full" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">delete</span>
+                  <span>Delete recording</span>
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        </article>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          No saved recordings found.
+        </article>
+      {% endfor %}
+      {% include "partials/pagination.html" %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

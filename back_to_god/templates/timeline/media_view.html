@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Timeline Media | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="media-viewer-shell">
+    <section class="media-viewer-header">
+      <a class="icon-action" href="{{ back_url }}" aria-label="Back">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </a>
+      <span class="grid min-w-0">
+        <strong>{{ item["original_name"] or "Timeline media" }}</strong>
+        <small class="text-btg-muted">{{ item["media_kind"] }} - {{ item["created_at"] | chat_timestamp }}</small>
+      </span>
+    </section>
+
+    <section class="media-viewer-frame">
+      {% if item["media_kind"] == "image" %}
+        <img src="{{ url_for('timeline.media', media_id=item['id']) }}" alt="" />
+      {% else %}
+        <video controls playsinline autoplay src="{{ url_for('timeline.media', media_id=item['id']) }}"></video>
+      {% endif %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

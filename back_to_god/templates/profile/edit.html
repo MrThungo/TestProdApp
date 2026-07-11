@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Profile | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[960px] gap-6 pb-28 pt-6">
+    {% include "partials/flash.html" %}
+
+    <section>
+      <p class="mb-1 text-xs font-black uppercase text-btg-gold">My profile</p>
+      <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Edit profile</h1>
+      <p class="mt-3 max-w-2xl leading-7 text-btg-muted">
+        Keep your church profile current. Your profile photo is stored privately by this Flask app.
+      </p>
+    </section>
+
+    <section class="material-card profile-card overflow-hidden">
+      <div class="cinematic-backdrop h-32"></div>
+      <div class="-mt-14 grid gap-4 p-4">
+        <div class="profile-summary">
+          <div class="profile-photo-shell">
+            <img
+              class="profile-photo {% if not user['profile_photo'] %}hidden{% endif %}"
+              data-profile-preview
+              src="{{ url_for('profile.photo', filename=user['profile_photo']) if user['profile_photo'] else '' }}"
+              alt=""
+            />
+            <div
+              class="profile-photo profile-photo-fallback {% if user['profile_photo'] %}hidden{% endif %}"
+              data-profile-fallback
+            >
+              {{ user["full_name"][:1] }}
+            </div>
+          </div>
+          <div class="profile-summary-copy">
+            <strong class="block text-xl">{{ user["full_name"] }}</strong>
+            <span class="text-sm text-btg-muted">{{ user["email"] }}</span>
+          </div>
+        </div>
+
+        <form class="grid gap-4" method="post" action="{{ url_for('profile.edit') }}" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Profile picture</span>
+            <input
+              class="material-field profile-file-input file:mr-4 file:rounded-md file:border-0 file:bg-btg-green file:px-4 file:py-2 file:font-bold file:text-white"
+              data-profile-input
+              name="profile_photo"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+            />
+          </label>
+
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Full name</span>
+            <input class="material-field" name="full_name" autocomplete="name" value="{{ user['full_name'] }}" required />
+          </label>
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Phone / WhatsApp</span>
+              <input class="material-field" name="phone" autocomplete="tel" value="{{ user['phone'] or '' }}" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Home area</span>
+              <input class="material-field" name="home_area" value="{{ user['home_area'] or '' }}" />
+            </label>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-3">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Identity type</span>
+              <select class="material-field" name="identity_type" data-identity-type>
+                <option value="sa_id" {% if user["identity_type"] != "foreign" %}selected{% endif %}>South African ID</option>
+                <option value="foreign" {% if user["identity_type"] == "foreign" %}selected{% endif %}>Foreign national</option>
+              </select>
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">SA ID number</span>
+              <input class="material-field" name="id_number" inputmode="numeric" maxlength="13" value="{{ user['id_number'] or '' }}" data-id-number data-dob-target="#profile_date_of_birth" data-age-target="#profile_age" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Passport / permit number</span>
+              <input class="material-field" name="foreign_id_number" value="{{ user['foreign_id_number'] or '' }}" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Nationality</span>
+              <input class="material-field" name="nationality" value="{{ user['nationality'] or '' }}" autocomplete="country-name" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Date of birth</span>
+              <input class="material-field" id="profile_date_of_birth" name="date_of_birth" type="date" value="{{ user['date_of_birth'] or '' }}" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Age</span>
+              <input class="material-field" id="profile_age" value="{{ user['date_of_birth'] | age_from_dob }}" readonly />
+            </label>
+          </div>
+
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">About me</span>
+            <textarea class="material-field" name="bio" rows="4">{{ user['bio'] or '' }}</textarea>
+          </label>
+
+          <section class="material-card grid gap-4 p-4">
+            <div>
+              <p class="text-xs font-black uppercase text-btg-gold">Emergency contact</p>
+              <h2 class="text-xl font-black">Someone we can call</h2>
+            </div>
+            <div class="grid gap-4 md:grid-cols-3">
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Full name</span>
+                <input class="material-field" name="emergency_contact_name" value="{{ user['emergency_contact_name'] or '' }}" />
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Phone</span>
+                <input class="material-field" name="emergency_contact_phone" autocomplete="tel" value="{{ user['emergency_contact_phone'] or '' }}" />
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Relationship</span>
+                <input class="material-field" name="emergency_contact_relationship" value="{{ user['emergency_contact_relationship'] or '' }}" placeholder="Parent, spouse, sibling..." />
+              </label>
+            </div>
+          </section>
+
+          <button class="material-button material-button-filled w-full" type="submit">
+            <span class="material-symbols-rounded text-[20px]">save</span>
+            <span>Save profile</span>
+          </button>
+        </form>
+      </div>
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

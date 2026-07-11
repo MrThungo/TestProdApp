@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Messages | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[860px] gap-6 pb-28 pt-6">
+    {% include "partials/flash.html" %}
+
+    <section>
+      <p class="mb-1 text-xs font-black uppercase text-btg-gold">Communication</p>
+      <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Messages</h1>
+      <p class="mt-3 max-w-2xl leading-7 text-btg-muted">Chat with other church app users.</p>
+    </section>
+
+    <section class="grid gap-3">
+      {% for user in users %}
+        {% set presence = presence_state(user["last_seen_at"]) %}
+        {% set last = last_messages.get(user["id"]) %}
+        <a class="message-list-item" href="{{ url_for('messages.thread', user_id=user['id']) }}">
+          {% if user["profile_photo"] %}
+            <img class="message-avatar" src="{{ url_for('profile.photo', filename=user['profile_photo']) }}" alt="" />
+          {% else %}
+            <span class="message-avatar fallback">{{ user["full_name"][:1] }}</span>
+          {% endif %}
+          <span class="grid min-w-0 gap-1">
+            <span class="flex items-center gap-2">
+              <strong class="truncate">{{ user["full_name"] }}</strong>
+              <span class="presence-dot {% if presence.online %}online{% endif %}"></span>
+            </span>
+            <small class="truncate text-btg-muted">
+              {% if last %}
+                {% if last["deleted_at"] %}
+                  Message deleted
+                {% elif last["body"] %}
+                  {{ last["body"] }}
+                {% elif last["media_kind"] == "image" %}
+                  Photo
+                {% elif last["media_kind"] == "voice" %}
+                  Voice note
+                {% elif last["media_kind"] == "video" %}
+                  Video
+                {% elif last["media_kind"] == "file" %}
+                  Attachment
+                {% else %}
+                  Message
+                {% endif %}
+              {% else %}
+                {{ presence.label }}
+              {% endif %}
+            </small>
+          </span>
+          {% if unread_counts.get(user["id"]) %}
+            <em class="notification-dot static-dot">{{ unread_counts[user["id"]] }}</em>
+          {% endif %}
+        </a>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          No users available for chat.
+        </article>
+      {% endfor %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

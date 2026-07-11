@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Saved Recording | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="media-viewer-shell">
+    {% include "partials/flash.html" %}
+    <section class="media-viewer-header">
+      <a class="icon-action" href="{{ back_url }}" aria-label="Back">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </a>
+      <span class="grid min-w-0">
+        <strong>{{ live["title"] }}</strong>
+        <small class="text-btg-muted">
+          {{ live["started_at"] | chat_timestamp }} - {{ meta["total_bytes"] | bits_size }}
+        </small>
+      </span>
+      <a class="material-button material-button-tonal media-viewer-back-button" href="{{ back_url }}">
+        <span class="material-symbols-rounded text-[20px]">arrow_back</span>
+        <span>Back</span>
+      </a>
+    </section>
+
+    <section class="media-viewer-frame">
+      <a class="media-back-float" href="{{ back_url }}" aria-label="Back">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </a>
+      <video controls playsinline autoplay src="{{ url_for('live.recording', live_id=live['id']) }}"></video>
+    </section>
+
+    <section class="material-card grid gap-3 p-4">
+      <p class="leading-7 text-btg-muted">
+        {{ live["description"] or "Recorded live from Back to God AOG City Centre." }}
+      </p>
+      <small class="text-btg-muted">
+        Recorded by {{ live["streamer_name"] }}. Stored as one compressed database video: {{ meta["total_bytes"] | bits_size }}.
+      </small>
+      {% if can_manage_session %}
+        <form method="post" action="{{ url_for('live.delete_recording', live_id=live['id']) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <button class="material-button material-button-tonal danger-action" type="submit">
+            <span class="material-symbols-rounded text-[20px]">delete</span>
+            <span>Delete recording</span>
+          </button>
+        </form>
+      {% endif %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

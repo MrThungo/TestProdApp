@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Deposit Slip | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  {% set file_url = url_for('finance.slip_file', slip_id=slip['id']) %}
+  <main class="finance-screen mx-auto grid w-[calc(100%_-_2rem)] max-w-[980px] gap-5 pb-28 pt-6" data-protected-finance data-watermark="Back to God AOG - {{ g.user['email'] }}">
+    <section class="finance-view-header">
+      <a class="icon-action" href="{{ back_url }}" aria-label="Back">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </a>
+      <span class="grid min-w-0 flex-1">
+        <strong class="truncate">{{ slip["title"] }}</strong>
+        <small class="text-btg-muted">
+          {{ slip["bank_name"] or "Bank" }} - {{ slip["deposit_date"] | pretty_date }} - {{ slip["size_bytes"] | bits_size }}
+        </small>
+      </span>
+      <button class="icon-action" type="button" data-print-page aria-label="Print">
+        <span class="material-symbols-rounded">print</span>
+      </button>
+    </section>
+
+    <section class="attachment-viewer finance-slip-viewer">
+      {% if slip["mime_type"][:6] == "image/" %}
+        <img src="{{ file_url }}" alt="{{ slip['title'] }}" />
+      {% elif slip["mime_type"] == "application/pdf" %}
+        <iframe src="{{ file_url }}" title="{{ slip['title'] }}"></iframe>
+      {% else %}
+        <span class="material-symbols-rounded text-[42px] text-btg-green">receipt_long</span>
+        <p class="text-btg-muted">Open this deposit slip from the secure file link below.</p>
+      {% endif %}
+      <a class="material-button material-button-filled w-full" href="{{ file_url }}">
+        <span class="material-symbols-rounded text-[20px]">open_in_new</span>
+        <span>Open file</span>
+      </a>
+    </section>
+
+    <section class="material-card grid gap-4 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <span>
+          <p class="text-xs font-black uppercase text-btg-gold">Linked report</p>
+          <h2 class="text-2xl font-black">Offerings linked to this slip</h2>
+        </span>
+        <em class="material-chip not-italic">{{ linked_total }}</em>
+      </div>
+      <div class="grid gap-3">
+        {% for offering in linked_offerings %}
+          <article class="finance-linked-offering">
+            <span class="grid min-w-0 gap-1">
+              <strong>{{ offering["offering_type"] }} - {{ cents_to_money(offering["amount_cents"]) }}</strong>
+              <small class="text-btg-muted">{{ offering["offering_date"] | pretty_date }} by {{ offering["captured_by_name"] }}</small>
+            </span>
+            {% if offering["note"] %}
+              <p>{{ offering["note"] }}</p>
+            {% endif %}
+          </article>
+        {% else %}
+          <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+            No offering report has been linked to this slip yet.
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

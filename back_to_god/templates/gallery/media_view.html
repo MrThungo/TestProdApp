@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Gallery Media | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="media-viewer-shell">
+    <section class="media-viewer-header">
+      <a class="icon-action" href="{{ back_url }}" aria-label="Back">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </a>
+      <span class="grid min-w-0">
+        <strong>{{ item["title"] }}</strong>
+        <small class="text-btg-muted">
+          {{ item["category_name"] }} - {{ (item["event_at"] or item["created_at"]) | chat_timestamp }}
+        </small>
+      </span>
+    </section>
+
+    <section class="media-viewer-frame">
+      {% if item["media_kind"] == "image" %}
+        <img src="{{ url_for('gallery.media', media_id=item['id']) }}" alt="" />
+      {% else %}
+        <video controls playsinline autoplay src="{{ url_for('gallery.media', media_id=item['id']) }}"></video>
+      {% endif %}
+    </section>
+
+    {% if item["description"] or can_manage_gallery %}
+      <section class="material-card grid gap-3 p-4">
+        {% if item["description"] %}
+          <p class="leading-7 text-btg-muted">{{ item["description"] }}</p>
+        {% endif %}
+        {% if can_manage_gallery %}
+          <form method="post" action="{{ url_for('gallery.delete_media', media_id=item['id']) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+            <button class="material-button material-button-tonal" type="submit">
+              <span class="material-symbols-rounded text-[20px]">delete</span>
+              <span>Remove from gallery</span>
+            </button>
+          </form>
+        {% endif %}
+      </section>
+    {% endif %}
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

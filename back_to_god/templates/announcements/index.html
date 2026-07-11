@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Announcements | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="announcement-shell">
+    {% include "partials/flash.html" %}
+
+    <section class="announcement-hero">
+      <div>
+        <p class="mb-2 text-xs font-black uppercase text-btg-gold">Church board</p>
+        <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Announcements</h1>
+        <p class="mt-4 max-w-2xl leading-7 text-btg-muted">
+          Important notices for services, fellowships, meetings, and church life.
+        </p>
+      </div>
+    </section>
+
+    {% if can_post_announcements %}
+      <section class="announcement-composer material-card">
+        <div>
+          <p class="text-xs font-black uppercase text-btg-gold">Admin post</p>
+          <h2 class="text-2xl font-black">Post an announcement</h2>
+        </div>
+        <form class="grid gap-4" method="post" action="{{ url_for('announcements.index') }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Title</span>
+            <input class="material-field" name="title" maxlength="120" placeholder="Choir practice, meeting, outreach..." required />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Details</span>
+            <textarea class="material-field" name="body" maxlength="1200" rows="5" placeholder="Write the announcement clearly." required></textarea>
+          </label>
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Announcement date and time</span>
+              <input class="material-field" name="event_at" type="datetime-local" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Reminder date and time</span>
+              <input class="material-field" name="reminder_at" type="datetime-local" />
+            </label>
+          </div>
+          <label class="remember-option">
+            <input type="checkbox" name="is_pinned" />
+            <span class="remember-box">
+              <span class="material-symbols-rounded">done</span>
+            </span>
+            <span>
+              <strong>Pin announcement</strong>
+              <small>Keep it above the rest until it is removed.</small>
+            </span>
+          </label>
+          <button class="material-button material-button-filled w-full" type="submit">
+            <span class="material-symbols-rounded text-[20px]">campaign</span>
+            <span>Post announcement</span>
+          </button>
+        </form>
+      </section>
+    {% endif %}
+
+    {% include "announcements/_list.html" %}
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

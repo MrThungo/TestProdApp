@@ -1,0 +1,211 @@
+<section
+  class="timeline-feed"
+  data-timeline-feed
+  data-timeline-poll-url="{{ url_for('timeline.poll') }}"
+  data-timeline-latest="{{ latest_update }}"
+  data-timeline-query="{{ query }}"
+>
+  {% for post in posts %}
+    {% set media_items = media_by_post.get(post["id"], []) %}
+    {% set can_manage_post = post["author_id"] == g.user["id"] or g.user["role"] in ["super_admin", "admin"] %}
+    {% set selected_viewers = viewer_ids_by_post.get(post["id"], []) %}
+    <article class="timeline-post" id="timeline-post-{{ post['id'] }}" data-timeline-post-id="{{ post['id'] }}">
+      <header class="timeline-post-header">
+        {% if post["author_photo"] %}
+          <img class="message-avatar" src="{{ url_for('profile.photo', filename=post['author_photo']) }}" alt="" />
+        {% else %}
+          <span class="message-avatar fallback">{{ post["author_name"][:1] }}</span>
+        {% endif %}
+        <span class="grid min-w-0">
+          <strong class="truncate">{{ post["author_name"] }}</strong>
+          <small class="text-btg-muted">
+            {{ (post["event_date"] or post["created_at"]) | chat_timestamp }}
+          </small>
+        </span>
+        {% if can_manage_post %}
+          <span class="timeline-post-actions">
+            <button
+              class="icon-action"
+              type="button"
+              data-timeline-edit-toggle
+              aria-controls="timeline-edit-{{ post['id'] }}"
+              aria-expanded="false"
+              aria-label="Edit post"
+              title="Edit post"
+            >
+              <span class="material-symbols-rounded text-[20px]">edit</span>
+            </button>
+            <form method="post" action="{{ url_for('timeline.delete', post_id=post['id']) }}" data-confirm-action="Move this timeline post to the recycle bin?">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+              <button class="icon-action danger-action" type="submit" aria-label="Move to recycle bin" title="Move to recycle bin">
+                <span class="material-symbols-rounded text-[20px]">delete</span>
+              </button>
+            </form>
+          </span>
+        {% endif %}
+      </header>
+
+      <div class="grid gap-2 px-4 pb-3">
+        <span class="timeline-privacy-chip">
+          <span class="material-symbols-rounded">{{ "lock" if post["visibility"] == "specific" else "public" }}</span>
+          <span>
+            {% if post["visibility"] == "specific" %}
+              Specific people{% if post["author_id"] == g.user["id"] %} - {{ post["viewer_count"] }} selected{% endif %}
+            {% else %}
+              Everyone
+            {% endif %}
+          </span>
+        </span>
+        <h2 class="text-2xl font-black">{{ post["title"] }}</h2>
+        {% if post["body"] %}
+          <p class="leading-7 text-btg-muted">{{ post["body"] }}</p>
+        {% endif %}
+      </div>
+
+      {% if can_manage_post %}
+        <form
+          class="timeline-edit-form hidden"
+          id="timeline-edit-{{ post['id'] }}"
+          method="post"
+          action="{{ url_for('timeline.edit', post_id=post['id']) }}"
+          data-timeline-edit-form
+        >
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Title</span>
+            <input class="material-field" name="title" maxlength="120" required value="{{ post['title'] }}" />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Description</span>
+            <textarea class="material-field" name="body" maxlength="900" rows="3">{{ post["body"] or "" }}</textarea>
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Event date and time</span>
+            <input class="material-field" name="event_date" type="datetime-local" value="{{ post['event_date'] or '' }}" />
+          </label>
+          <fieldset class="audience-card" data-audience-control>
+            <legend class="text-sm font-bold text-btg-muted">Who can see this post?</legend>
+            <div class="audience-options">
+              <label>
+                <input type="radio" name="visibility" value="everyone" {% if post["visibility"] != "specific" %}checked{% endif %} data-audience-choice />
+                <span class="material-symbols-rounded">public</span>
+                <strong>Everyone</strong>
+              </label>
+              <label>
+                <input type="radio" name="visibility" value="specific" {% if post["visibility"] == "specific" %}checked{% endif %} data-audience-choice />
+                <span class="material-symbols-rounded">lock</span>
+                <strong>Specific people</strong>
+              </label>
+            </div>
+            <div class="audience-picker is-hidden" data-audience-picker>
+              <label class="audience-search">
+                <span class="material-symbols-rounded">search</span>
+                <input type="search" autocomplete="off" placeholder="Look up people" data-audience-search />
+              </label>
+              {% for user in viewer_options %}
+                {% if user["id"] != post["author_id"] %}
+                  <label class="audience-user" data-audience-user data-search-text="{{ (user['full_name'] ~ ' ' ~ user['email'] ~ ' ' ~ user['role'])|lower }}">
+                    <input type="checkbox" name="viewer_ids" value="{{ user['id'] }}" {% if user["id"] in selected_viewers %}checked{% endif %} />
+                    {% if user["profile_photo"] %}
+                      <img src="{{ url_for('profile.photo', filename=user['profile_photo']) }}" alt="" />
+                    {% else %}
+                      <span>{{ user["full_name"][:1] }}</span>
+                    {% endif %}
+                    <strong>{{ user["full_name"] }}</strong>
+                    <small>{{ user["role"].replace("_", " ") }}</small>
+                  </label>
+                {% endif %}
+              {% else %}
+                <p class="text-sm font-bold text-btg-muted">No other active users are available yet.</p>
+              {% endfor %}
+            </div>
+          </fieldset>
+          <div class="timeline-edit-actions">
+            <button class="material-button material-button-filled" type="submit">
+              <span class="material-symbols-rounded text-[20px]">check</span>
+              <span>Save changes</span>
+            </button>
+            <button class="material-button material-button-tonal" type="button" data-timeline-edit-cancel>
+              <span class="material-symbols-rounded text-[20px]">close</span>
+              <span>Cancel</span>
+            </button>
+          </div>
+        </form>
+      {% endif %}
+
+      {% if media_items %}
+        <div class="timeline-media-grid count-{{ media_items|length if media_items|length < 5 else 5 }}">
+          {% for media in media_items[:5] %}
+            {% set media_back_url = timeline_return_base ~ '#timeline-media-' ~ media['id'] %}
+            {% if media["media_kind"] == "image" %}
+              <a
+                class="timeline-media-item"
+                id="timeline-media-{{ media['id'] }}"
+                href="{{ url_for('timeline.media_view', media_id=media['id'], back=media_back_url) }}"
+              >
+                <img src="{{ url_for('timeline.media', media_id=media['id']) }}" alt="" loading="lazy" />
+                {% if loop.index == 5 and media_items|length > 5 %}
+                  <em>+{{ media_items|length - 5 }}</em>
+                {% endif %}
+              </a>
+            {% else %}
+              <div class="timeline-media-item timeline-video-item" id="timeline-media-{{ media['id'] }}">
+                <video controls playsinline preload="metadata" src="{{ url_for('timeline.media', media_id=media['id']) }}"></video>
+                <a
+                  class="timeline-video-open"
+                  href="{{ url_for('timeline.media_view', media_id=media['id'], back=media_back_url) }}"
+                  aria-label="Open video"
+                  title="Open video"
+                >
+                  <span class="material-symbols-rounded">arrow_outward</span>
+                </a>
+                {% if loop.index == 5 and media_items|length > 5 %}
+                  <em>+{{ media_items|length - 5 }}</em>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <footer class="timeline-actions">
+        <form method="post" action="{{ url_for('timeline.like', post_id=post['id']) }}" data-timeline-like-form>
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <button class="timeline-action {% if post['id'] in my_reactions %}active{% endif %}" type="submit" data-timeline-like-button>
+            <span class="material-symbols-rounded">favorite</span>
+            <span data-timeline-like-count>{{ post["reaction_count"] }}</span>
+          </button>
+        </form>
+        <span class="timeline-action passive">
+          <span class="material-symbols-rounded">chat_bubble</span>
+          <span>{{ post["comment_count"] }}</span>
+        </span>
+        <span class="timeline-action passive">
+          <span class="material-symbols-rounded">collections</span>
+          <span>{{ post["image_count"] }} photos - {{ post["video_count"] }} videos</span>
+        </span>
+      </footer>
+
+      <section class="timeline-comments">
+        {% for comment in comments_by_post.get(post["id"], []) %}
+          <article>
+            <strong>{{ comment["full_name"] }}</strong>
+            <p>{{ comment["body"] }}</p>
+          </article>
+        {% endfor %}
+        <form method="post" action="{{ url_for('timeline.comment', post_id=post['id']) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <input class="material-field" name="body" maxlength="360" placeholder="Write a comment" required />
+          <button class="icon-action" type="submit" aria-label="Send comment">
+            <span class="material-symbols-rounded">send</span>
+          </button>
+        </form>
+      </section>
+    </article>
+  {% else %}
+    <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+      No timeline posts found.
+    </article>
+  {% endfor %}
+  {% include "partials/pagination.html" %}
+</section>

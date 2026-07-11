@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Gallery | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="gallery-shell">
+    {% include "partials/flash.html" %}
+
+    <section class="gallery-hero">
+      <div>
+        <p class="mb-2 text-xs font-black uppercase text-btg-gold">Church memories</p>
+        <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Gallery</h1>
+        <p class="mt-4 max-w-2xl leading-7 text-btg-muted">
+          Admin-uploaded photos and videos, organised by category for services, fellowship, outreach, and events.
+        </p>
+      </div>
+      <form class="gallery-toolbar" method="get" action="{{ url_for('gallery.index') }}">
+        <label>
+          <span class="material-symbols-rounded">search</span>
+          <input name="q" value="{{ query }}" autocomplete="off" placeholder="Search gallery" />
+        </label>
+        <select name="category" class="material-field" aria-label="Category">
+          <option value="0" {% if not category_id %}selected{% endif %}>All categories</option>
+          {% for category in categories %}
+            <option value="{{ category['id'] }}" {% if category_id == category['id'] %}selected{% endif %}>
+              {{ category["name"] }}
+            </option>
+          {% endfor %}
+        </select>
+        <select name="kind" class="material-field" aria-label="Media type">
+          <option value="" {% if not media_kind %}selected{% endif %}>All media</option>
+          <option value="image" {% if media_kind == "image" %}selected{% endif %}>Photos</option>
+          <option value="video" {% if media_kind == "video" %}selected{% endif %}>Videos</option>
+        </select>
+        <button class="material-button material-button-filled" type="submit">
+          <span class="material-symbols-rounded text-[20px]">filter_alt</span>
+          <span>Apply</span>
+        </button>
+      </form>
+    </section>
+
+    {% if can_manage_gallery %}
+      <section class="gallery-upload material-card">
+        <div>
+          <p class="text-xs font-black uppercase text-btg-gold">Admin upload</p>
+          <h2 class="text-2xl font-black">Add to gallery</h2>
+        </div>
+        <form class="grid gap-4" method="post" action="{{ url_for('gallery.index') }}" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Title</span>
+              <input class="material-field" name="title" maxlength="120" placeholder="Sunday service, youth night..." required />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Category</span>
+              <input class="material-field" name="category_name" list="gallery-category-options" maxlength="80" placeholder="Services, Choir, Outreach..." required />
+              <datalist id="gallery-category-options">
+                {% for category in categories %}
+                  <option value="{{ category['name'] }}"></option>
+                {% endfor %}
+              </datalist>
+            </label>
+          </div>
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Event date and time</span>
+              <input class="material-field" name="event_at" type="datetime-local" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Pictures or videos</span>
+              <input class="material-field file:mr-4 file:rounded-md file:border-0 file:bg-btg-green file:px-4 file:py-2 file:font-bold file:text-white" name="media" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/ogg" multiple required />
+            </label>
+          </div>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Description</span>
+            <textarea class="material-field" name="description" maxlength="900" rows="3" placeholder="Add context for this gallery upload."></textarea>
+          </label>
+          <button class="material-button material-button-filled w-full" type="submit">
+            <span class="material-symbols-rounded text-[20px]">upload</span>
+            <span>Upload to gallery</span>
+          </button>
+        </form>
+      </section>
+    {% endif %}
+
+    {% include "gallery/_grid.html" %}
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Attachment | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[860px] gap-5 pb-28 pt-6">
+    <section class="flex items-center justify-between gap-3">
+      <a class="icon-action" href="{{ url_for('messages.thread', user_id=(item['recipient_id'] if item['sender_id'] == g.user['id'] else item['sender_id'])) }}" aria-label="Back">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </a>
+      <span class="grid min-w-0 flex-1">
+        <strong class="truncate">{{ item["original_name"] or "Message attachment" }}</strong>
+        <small class="text-btg-muted">{{ item["media_kind"] }} - {{ item["created_at"] | chat_timestamp }}</small>
+      </span>
+      <form method="post" action="{{ url_for('messages.delete_attachment', attachment_id=item['id']) }}" data-confirm-action="Delete this attachment?">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+        <button class="icon-action danger-action" type="submit" aria-label="Delete attachment">
+          <span class="material-symbols-rounded">delete</span>
+        </button>
+      </form>
+    </section>
+
+    <section class="attachment-viewer">
+      {% if item["media_kind"] == "image" %}
+        <img src="{{ url_for('messages.attachment', attachment_id=item['id']) }}" alt="" />
+      {% elif item["media_kind"] == "video" %}
+        <video controls playsinline src="{{ url_for('messages.attachment', attachment_id=item['id']) }}"></video>
+      {% elif item["media_kind"] == "voice" %}
+        <audio controls preload="metadata" src="{{ url_for('messages.attachment', attachment_id=item['id']) }}"></audio>
+      {% else %}
+        <span class="material-symbols-rounded text-[42px] text-btg-green">description</span>
+        <p class="text-btg-muted">Open or download this attachment from the link below.</p>
+      {% endif %}
+      <a class="material-button material-button-filled w-full" href="{{ url_for('messages.attachment', attachment_id=item['id']) }}">
+        <span class="material-symbols-rounded text-[20px]">open_in_new</span>
+        <span>Open file</span>
+      </a>
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

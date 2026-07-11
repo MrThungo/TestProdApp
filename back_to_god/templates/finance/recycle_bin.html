@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Finance Recycle Bin | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[980px] gap-6 pb-28 pt-6">
+    {% include "partials/flash.html" %}
+
+    <section class="grid gap-4">
+      <a class="icon-action" href="{{ url_for('finance.index') }}" aria-label="Back">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </a>
+      <span>
+        <p class="mb-1 text-xs font-black uppercase text-btg-gold">Finance</p>
+        <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Recycle bin</h1>
+        <p class="mt-3 max-w-2xl leading-7 text-btg-muted">
+          Deleted deposit slips stay here so super admin can restore them later.
+        </p>
+      </span>
+    </section>
+
+    <section class="grid gap-3">
+      {% for slip in slips %}
+        <article class="material-card grid gap-4 p-4">
+          <div class="flex items-center justify-between gap-3">
+            <span class="grid min-w-0 gap-1">
+              <strong class="truncate">{{ slip["title"] }}</strong>
+              <small class="truncate text-btg-muted">
+                {{ slip["bank_name"] or "Bank" }} - {{ slip["deposit_date"] | pretty_date }}
+              </small>
+            </span>
+            <em class="material-chip not-italic">{{ cents_to_money(slip["amount_cents"]) }}</em>
+          </div>
+          <p class="text-sm text-btg-muted">
+            Deleted {{ slip["deleted_at"] | chat_timestamp }} by {{ slip["deleted_by_name"] or "Unknown" }}.
+            Uploaded by {{ slip["created_by_name"] or "Unknown" }}.
+          </p>
+          <form method="post" action="{{ url_for('finance.restore_slip', slip_id=slip['id']) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+            <button class="material-button material-button-filled" type="submit">
+              <span class="material-symbols-rounded text-[20px]">restore</span>
+              <span>Restore</span>
+            </button>
+          </form>
+        </article>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          Finance recycle bin is empty.
+        </article>
+      {% endfor %}
+      {% include "partials/pagination.html" %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

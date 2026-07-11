@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[860px] gap-6 pb-28 pt-6">
+    {% include "partials/flash.html" %}
+
+    <section>
+      <p class="mb-1 text-xs font-black uppercase text-btg-gold">Updates</p>
+      <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Notifications</h1>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <form method="post" action="{{ url_for('notifications.read_all') }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <button class="material-button material-button-tonal" type="submit">
+            <span class="material-symbols-rounded text-[20px]">done_all</span>
+            <span>Mark all read</span>
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('notifications.clear_all') }}" data-confirm-action="Clear all notifications?">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <button class="material-button material-button-tonal danger-action" type="submit">
+            <span class="material-symbols-rounded text-[20px]">delete_sweep</span>
+            <span>Clear all</span>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <section class="grid gap-3">
+      {% for item in notifications %}
+        <article class="notification-card {% if not item['is_read'] %}notification-unread{% else %}notification-read{% endif %}">
+          <span class="flex items-center justify-between gap-3">
+            <strong class="flex items-center gap-2">
+              {% if not item["is_read"] %}
+                <i class="unread-pulse"></i>
+              {% endif %}
+              <span>{{ item["title"] }}</span>
+            </strong>
+            <small class="text-btg-muted">{{ item["created_at"] | pretty_date }}</small>
+          </span>
+          <span class="text-btg-muted">{{ item["message"] }}</span>
+          <em class="not-italic">{{ "Unread" if not item["is_read"] else "Read" }}</em>
+          <span class="notification-actions">
+            <a class="material-button material-button-tonal" href="{{ url_for('notifications.open_notification', notification_id=item['id']) }}">
+              <span class="material-symbols-rounded text-[20px]">open_in_new</span>
+              <span>Open</span>
+            </a>
+            <form method="post" action="{{ url_for('notifications.delete', notification_id=item['id']) }}" data-confirm-action="Delete this notification?">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+              <button class="material-button material-button-tonal danger-action" type="submit">
+                <span class="material-symbols-rounded text-[20px]">delete</span>
+                <span>Delete</span>
+              </button>
+            </form>
+          </span>
+        </article>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          No notifications yet.
+        </article>
+      {% endfor %}
+      {% include "partials/pagination.html" %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+
+{% block title %}Back to God AOG | Gqeberha City Centre{% endblock %}
+
+{% block page %}
+  <header class="fixed inset-x-0 top-0 z-30 border-b border-white/10 bg-btg-night/90 text-white backdrop-blur-xl">
+    <div class="mx-auto flex max-w-[1180px] items-center justify-between gap-4 px-4 py-3 md:px-6">
+      <a class="flex min-w-0 items-center gap-3 no-underline" href="{{ url_for('public.landing') }}">
+        <span class="landing-logo-small">
+          <img src="{{ url_for('static', filename='images/brand/city-centre-logo.png') }}" alt="City Centre Assemblies of God logo" />
+        </span>
+        <span class="min-w-0">
+          <strong class="block truncate leading-tight">City Centre AOG</strong>
+          <small class="block truncate text-xs text-white/70">Assemblies of God - Back to God</small>
+        </span>
+      </a>
+
+      <nav class="hidden items-center gap-5 text-sm font-bold text-white/75 md:flex" aria-label="Landing">
+        <a class="landing-nav-link" href="#vision">Vision</a>
+        <a class="landing-nav-link" href="#mission">Mission</a>
+        <a class="landing-nav-link" href="#services">Services</a>
+        <a class="landing-nav-link" href="#contact">Contact</a>
+      </nav>
+
+      <div class="flex shrink-0 items-center gap-2">
+        {% include "partials/theme_toggle.html" %}
+        <a class="material-button material-button-ghost shrink-0" href="{{ url_for('auth.login') }}">
+          <span class="material-symbols-rounded text-[20px]">login</span>
+          <span>Sign in</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="bg-[#f7f8f3] text-btg-ink">
+    <section class="landing-hero blend-section blend-to-mist relative isolate overflow-hidden px-4 pb-16 pt-28 text-white md:px-6">
+      <div class="mx-auto grid min-h-[calc(100svh_-_7rem)] w-full max-w-[1180px] content-end gap-8 lg:grid-cols-[1fr_420px] lg:items-end">
+        <div class="max-w-4xl">
+          <div class="mb-7 flex items-center gap-4">
+            <span class="landing-logo-hero">
+              <img src="{{ url_for('static', filename='images/brand/city-centre-logo.png') }}" alt="" />
+            </span>
+            <span>
+              <span class="block text-xs font-black uppercase text-btg-gold">Gqeberha City Centre</span>
+              <span class="block text-sm font-bold text-white/70">Bound in fellowship by the Spirit</span>
+            </span>
+          </div>
+
+          <h1 class="max-w-4xl text-[clamp(3.45rem,16vw,8.5rem)] font-black leading-[0.86]">
+            City Centre
+          </h1>
+          <p class="mt-5 max-w-2xl text-[clamp(1.2rem,4.8vw,2.25rem)] font-extrabold leading-tight">
+            A spiritual home to students and residents around Gqeberha CBD.
+          </p>
+          <p class="mt-5 max-w-2xl text-base leading-7 text-white/70">
+            A local assembly of Assemblies of God - Back to God, built around fellowship,
+            discipleship, worship, care, and service to the Central community.
+          </p>
+
+          <div class="mt-8 flex flex-wrap gap-3">
+            <a class="material-button material-button-filled" href="{{ url_for('auth.login') }}">
+              <span class="material-symbols-rounded text-[20px]">arrow_forward</span>
+              <span>Enter app</span>
+            </a>
+            <a class="material-button material-button-ghost" href="#services">
+              <span class="material-symbols-rounded text-[20px]">event</span>
+              <span>Service times</span>
+            </a>
+          </div>
+        </div>
+
+        <aside class="landing-quick-panel" aria-label="Service summary">
+          <p class="panel-kicker">This week at City Centre</p>
+          <div class="hero-stat">
+            <span class="material-symbols-rounded">wb_sunny</span>
+            <span>
+              <small>Sunday service</small>
+              <strong>@10AM</strong>
+            </span>
+          </div>
+          <div class="hero-stat">
+            <span class="material-symbols-rounded">schedule</span>
+            <span>
+              <small>Weekday services</small>
+              <strong>18:00</strong>
+            </span>
+          </div>
+          <div class="hero-stat">
+            <span class="material-symbols-rounded">location_on</span>
+            <span>
+              <small>Location</small>
+              <strong>58 Park Drive</strong>
+            </span>
+          </div>
+          <a class="panel-action" href="#contact">
+            <span>Plan your visit</span>
+            <span class="material-symbols-rounded">arrow_forward</span>
+          </a>
+        </aside>
+      </div>
+    </section>
+
+    <section class="landing-intro-flow blend-section blend-mist blend-to-white relative mx-auto grid w-[calc(100%_-_2rem)] max-w-[1180px] gap-4 py-10 md:grid-cols-3 md:py-16">
+      <article class="landing-intro-card">
+        <span class="material-symbols-rounded">diversity_3</span>
+        <p>Welcome</p>
+        <h2>A convenient spiritual home in the CBD.</h2>
+        <small>Students, residents, families, and workers around Central Gqeberha.</small>
+      </article>
+      <article class="landing-intro-card">
+        <span class="material-symbols-rounded">church</span>
+        <p>Gather</p>
+        <h2>Sunday worship at Lilitha College of Nursing.</h2>
+        <small>A weekly gathering shaped by worship, word, care, and fellowship.</small>
+      </article>
+      <article class="landing-intro-card">
+        <span class="material-symbols-rounded">volunteer_activism</span>
+        <p>Serve</p>
+        <h2>Active fellowship for growth, care, and outreach.</h2>
+        <small>Built for soul winning, soul healing, and soul keeping.</small>
+      </article>
+    </section>
+
+    <section class="blend-section blend-white blend-to-night bg-white py-16 md:py-20" id="vision">
+      <div class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1180px] gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+        <div class="section-heading sticky-block">
+          <p>Our vision</p>
+          <h2>Closer to the people we serve.</h2>
+          <span>The vision and purpose of the establishment of City Centre Local Assembly.</span>
+        </div>
+
+        <div class="grid gap-3">
+          <article class="vision-row">
+            <span class="material-symbols-rounded">home_pin</span>
+            <p>Provide a more convenient local and spiritual home for AOG Back to God students and residents in the CBD area of Port Elizabeth (Gqeberha).</p>
+          </article>
+          <article class="vision-row">
+            <span class="material-symbols-rounded">group_add</span>
+            <p>Reconnect previous AOG Back to God members who are worshipping in other ministries within the CBD area.</p>
+          </article>
+          <article class="vision-row">
+            <span class="material-symbols-rounded">public</span>
+            <p>Evangelize, disciple, and create outreach programs for soul winning, soul healing, and soul keeping.</p>
+          </article>
+          <article class="vision-row">
+            <span class="material-symbols-rounded">handshake</span>
+            <p>Be an effective church within the Central community through active participation in relevant socio-economic development initiatives.</p>
+          </article>
+          <article class="vision-row">
+            <span class="material-symbols-rounded">hub</span>
+            <p>Build effective home cells in residential areas for spiritual growth and further church growth through future church planting in urban Gqeberha.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="blend-section blend-night blend-to-mist bg-btg-night py-16 text-white md:py-20" id="mission">
+      <div class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1180px] gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-start">
+        <div class="section-heading section-heading-dark">
+          <p>Our mission</p>
+          <h2>Make disciples. Build fellowship. Serve the city.</h2>
+          <span>
+            Our mission is aligned with Assemblies of God Back to God and Matthew 28:19-20:
+            go, make disciples, baptize, teach obedience, and live with Christ's promise of presence.
+          </span>
+        </div>
+
+        <div class="scripture-panel">
+          <span class="material-symbols-rounded">auto_stories</span>
+          <h3>Matthew 28:19-20</h3>
+          <p>
+            A commission to go, disciple nations, baptize in the name of the Father, Son,
+            and Holy Spirit, and teach people to obey Christ.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="blend-section blend-mist blend-to-white bg-[#f7f8f3] py-16 md:py-20">
+      <div class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1180px] gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+        <div class="section-heading sticky-block">
+          <p>Our pillars</p>
+          <h2>Worshipping God in spirit and in truth.</h2>
+        </div>
+
+        <div class="pillar-grid">
+          <article><span class="material-symbols-rounded">favorite</span><strong>Love</strong></article>
+          <article><span class="material-symbols-rounded">verified</span><strong>Holiness</strong></article>
+          <article><span class="material-symbols-rounded">volunteer_activism</span><strong>Compassion</strong></article>
+          <article><span class="material-symbols-rounded">church</span><strong>Worshipping God in spirit and in truth</strong></article>
+          <article><span class="material-symbols-rounded">diversity_1</span><strong>Unity</strong></article>
+          <article><span class="material-symbols-rounded">local_dining</span><strong>Breaking of bread</strong></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="blend-section blend-white blend-to-mist bg-white py-16 md:py-20" id="services">
+      <div class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1180px] gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+        <div class="section-heading sticky-block">
+          <p>Our services</p>
+          <h2>A weekly rhythm for prayer, worship, and fellowship.</h2>
+          <span>Weekday services all begin at 18:00. Sunday service begins at 10AM.</span>
+        </div>
+
+        <div class="schedule-grid">
+          <article class="schedule-card sunday">
+            <span class="material-symbols-rounded">wb_sunny</span>
+            <p>Sunday</p>
+            <h3>Sunday Service</h3>
+            <strong>@10AM</strong>
+          </article>
+          <article class="schedule-card">
+            <span class="material-symbols-rounded">folded_hands</span>
+            <p>Monday</p>
+            <h3>Prayer</h3>
+            <strong>18:00</strong>
+          </article>
+          <article class="schedule-card">
+            <span class="material-symbols-rounded">queue_music</span>
+            <p>Tuesday</p>
+            <h3>Choir Practice</h3>
+            <strong>18:00</strong>
+          </article>
+          <article class="schedule-card">
+            <span class="material-symbols-rounded">diversity_2</span>
+            <p>Wednesday</p>
+            <h3>Girl's Service and Men's Fellowship</h3>
+            <strong>18:00</strong>
+          </article>
+          <article class="schedule-card">
+            <span class="material-symbols-rounded">groups</span>
+            <p>Thursday</p>
+            <h3>Mother's Service</h3>
+            <strong>18:00</strong>
+          </article>
+          <article class="schedule-card">
+            <span class="material-symbols-rounded">celebration</span>
+            <p>Friday</p>
+            <h3>Youth Service</h3>
+            <strong>18:00</strong>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="blend-section blend-mist blend-to-night bg-[#f7f8f3] py-16 md:py-20">
+      <div class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1180px] gap-4 md:grid-cols-2">
+        <article class="app-feature-panel">
+          <span class="material-symbols-rounded">app_registration</span>
+          <p>Church app</p>
+          <h2>Designed for welcome and follow-up.</h2>
+          <span>Secure roles, visitor capture, profile photos, and church follow-up workflows are already in place.</span>
+        </article>
+        <article class="app-feature-panel">
+          <span class="material-symbols-rounded">admin_panel_settings</span>
+          <p>Access</p>
+          <h2>Built for the people serving the house.</h2>
+          <span>Super admins, admins, pastors, and members each have a proper foundation for future modules.</span>
+        </article>
+      </div>
+    </section>
+
+    <footer class="blend-section blend-night blend-end bg-btg-night px-4 py-12 text-white" id="contact">
+      <div class="mx-auto grid max-w-[1180px] gap-8 md:grid-cols-[1.05fr_1fr_1fr]">
+        <div>
+          <div class="mb-4 flex items-center gap-3">
+            <span class="landing-logo-small">
+              <img src="{{ url_for('static', filename='images/brand/city-centre-logo.png') }}" alt="" />
+            </span>
+            <span>
+              <p class="text-xs font-black uppercase text-btg-gold">Contact us</p>
+              <h2 class="text-2xl font-black">City Centre AOG</h2>
+            </span>
+          </div>
+          <p class="max-w-sm leading-7 text-white/70">
+            Assemblies of God - Back to God, serving students and residents around Gqeberha CBD.
+          </p>
+        </div>
+        <div class="grid gap-3 text-sm">
+          <a class="footer-link" href="https://www.instagram.com/citycentre_aog" target="_blank" rel="noreferrer">
+            <span class="material-symbols-rounded">alternate_email</span>
+            <span>@citycentre_aog</span>
+          </a>
+          <p class="footer-link">
+            <span class="material-symbols-rounded">public</span>
+            <span>City Centre Assemblies of God</span>
+          </p>
+          <p class="footer-link">
+            <span class="material-symbols-rounded">call</span>
+            <span>Mr Msutu - +27 73 807 2500</span>
+          </p>
+          <p class="footer-link">
+            <span class="material-symbols-rounded">call</span>
+            <span>Mr Ketwa - 0832072727</span>
+          </p>
+        </div>
+        <div class="grid content-start gap-3 text-sm">
+          <p class="footer-link">
+            <span class="material-symbols-rounded">location_on</span>
+            <span>58 Park Drive, Lilitha College of Nursing, Central Gqeberha 6001</span>
+          </p>
+          <a class="material-button material-button-filled w-fit" href="{{ url_for('auth.login') }}">
+            <span class="material-symbols-rounded text-[20px]">login</span>
+            <span>Sign in</span>
+          </a>
+        </div>
+      </div>
+    </footer>
+  </main>
+{% endblock %}

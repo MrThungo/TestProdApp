@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Visitors | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1080px] gap-6 pb-28 pt-6">
+    {% include "partials/flash.html" %}
+
+    <section>
+      <p class="mb-1 text-xs font-black uppercase text-btg-gold">Hospitality</p>
+      <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Visitors</h1>
+      <p class="mt-3 max-w-2xl leading-7 text-btg-muted">
+        {% if can_capture_visitors %}
+          Capture first comers and visitors quickly after a service or gathering.
+        {% else %}
+          Review visitor information and follow-up progress.
+        {% endif %}
+      </p>
+    </section>
+
+    <section class="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {% for value, label, icon in [
+        (visitor_counts.all, "total", "groups"),
+        (visitor_counts.new, "new", "fiber_new"),
+        (visitor_counts.follow_up, "follow up", "phone_in_talk"),
+        (visitor_counts.connected, "connected", "verified")
+      ] %}
+        <article class="material-card grid min-h-28 content-end p-4">
+          <span class="material-symbols-rounded mb-3 text-btg-green">{{ icon }}</span>
+          <strong class="text-[clamp(2rem,10vw,3.4rem)] leading-none">{{ value }}</strong>
+          <span class="text-sm text-btg-muted">{{ label }}</span>
+        </article>
+      {% endfor %}
+      {% include "partials/pagination.html" %}
+    </section>
+
+    {% if can_capture_visitors %}
+      <section class="material-card grid gap-4 p-4">
+        <h2 class="text-2xl font-black">Capture details</h2>
+        <form class="grid gap-4" method="post" action="{{ url_for('visitors.index') }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Full name</span>
+            <input class="material-field" name="full_name" autocomplete="name" required />
+          </label>
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Phone / WhatsApp</span>
+              <input class="material-field" name="phone" autocomplete="tel" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Email</span>
+              <input class="material-field" name="email" type="email" autocomplete="email" />
+            </label>
+          </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Identity type</span>
+              <select class="material-field" name="identity_type" data-identity-type>
+                <option value="sa_id">South African ID</option>
+                <option value="foreign">Foreign national</option>
+              </select>
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">SA ID number</span>
+              <input class="material-field" name="id_number" inputmode="numeric" maxlength="13" data-id-number data-dob-target="#visitor_date_of_birth" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Passport / permit number</span>
+              <input class="material-field" name="foreign_id_number" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Nationality</span>
+              <input class="material-field" name="nationality" autocomplete="country-name" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Date of birth</span>
+              <input class="material-field" id="visitor_date_of_birth" name="date_of_birth" type="date" />
+            </label>
+          </div>
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Visit date</span>
+              <input class="material-field" name="visit_date" type="date" value="{{ today }}" />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Visit type</span>
+              <select class="material-field" name="visit_type">
+                <option>First time</option>
+                <option>Returning visitor</option>
+                <option>Invited guest</option>
+                <option>New to the city</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Age group</span>
+              <select class="material-field" name="age_group">
+                <option>Adult</option>
+                <option>Youth</option>
+                <option>Child</option>
+                <option>Senior</option>
+                <option>Family</option>
+              </select>
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Invited by</span>
+              <input class="material-field" name="invited_by" />
+            </label>
+          </div>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Home area</span>
+            <input class="material-field" name="home_area" />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Prayer request</span>
+            <textarea class="material-field" name="prayer_request" rows="3"></textarea>
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Notes</span>
+            <textarea class="material-field" name="notes" rows="3"></textarea>
+          </label>
+          <label class="grid grid-cols-[22px_1fr] items-center gap-2">
+            <input class="h-[18px] min-h-[18px] w-[18px] accent-btg-green" name="consent_to_contact" type="checkbox" checked />
+            <span class="text-sm font-bold text-btg-muted">They may be contacted for church follow-up.</span>
+          </label>
+          <button class="material-button material-button-filled w-full" type="submit">
+            <span class="material-symbols-rounded text-[20px]">save</span>
+            <span>Save visitor</span>
+          </button>
+        </form>
+      </section>
+    {% endif %}
+
+    <section class="grid gap-3">
+      <p class="text-xs font-black uppercase text-btg-gold">Recent visitors</p>
+      {% for visitor in visitors %}
+        <article class="material-card grid gap-4 p-4">
+          <div class="flex items-center justify-between gap-3">
+            <span class="grid min-w-0 gap-1">
+              <strong class="truncate">{{ visitor["full_name"] }}</strong>
+              <small class="truncate text-btg-muted">{{ visitor["visit_type"] }} - {{ visitor["visit_date"] | pretty_date }}</small>
+            </span>
+            <em class="material-chip not-italic">{{ status_labels[visitor["follow_up_status"]] }}</em>
+          </div>
+          <dl class="grid gap-2 md:grid-cols-3">
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Phone</dt><dd class="font-semibold">{{ visitor["phone"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Email</dt><dd class="font-semibold">{{ visitor["email"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Identity</dt><dd class="font-semibold">{{ "Foreign national" if visitor["identity_type"] == "foreign" else "South African ID" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">ID / passport</dt><dd class="font-semibold">{{ visitor["foreign_id_number"] if visitor["identity_type"] == "foreign" else (visitor["id_number"] or "Not added") }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Nationality</dt><dd class="font-semibold">{{ visitor["nationality"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">DOB</dt><dd class="font-semibold">{{ visitor["date_of_birth"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Area</dt><dd class="font-semibold">{{ visitor["home_area"] or "Not added" }}</dd></div>
+          </dl>
+          {% if visitor["prayer_request"] %}
+            <p class="leading-7 text-btg-muted"><strong>Prayer:</strong> {{ visitor["prayer_request"] }}</p>
+          {% endif %}
+          {% if can_update_visitors %}
+            <form class="flex flex-wrap items-center gap-2" method="post" action="{{ url_for('visitors.update_visitor_status', visitor_id=visitor['id']) }}">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+              <select class="material-field flex-1" name="follow_up_status">
+                {% for status, label in status_labels.items() %}
+                  <option value="{{ status }}" {% if visitor["follow_up_status"] == status %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <button class="material-button material-button-tonal" type="submit">Update</button>
+            </form>
+          {% endif %}
+        </article>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          No visitors captured yet.
+        </article>
+      {% endfor %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

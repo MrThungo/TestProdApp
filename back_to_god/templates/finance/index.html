@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+
+{% block title %}Finance | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="finance-screen mx-auto grid w-[calc(100%_-_2rem)] max-w-[1080px] gap-6 pb-28 pt-6" data-protected-finance data-watermark="Back to God AOG - {{ g.user['email'] }}">
+    {% include "partials/flash.html" %}
+
+    <section class="material-card bg-gradient-to-br from-btg-green to-[#202823] p-6 text-white">
+      <p class="mb-2 text-xs font-black uppercase text-btg-gold">Finance</p>
+      <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Deposit slips</h1>
+      <p class="mt-4 max-w-2xl leading-7 text-white/75">
+        {% if can_manage_finance %}
+          Treasurer uploads slips; admin, pastor, or super admin approves public visibility.
+        {% else %}
+          View approved deposit slips during their visibility window.
+        {% endif %}
+      </p>
+      {% if can_manage_finance %}
+        <div class="mt-4 flex flex-wrap gap-2">
+          <a class="material-button material-button-ghost" href="{{ url_for('finance.deposit_slips_report') }}">
+            <span class="material-symbols-rounded text-[20px]">download</span>
+            <span>Finance CSV</span>
+          </a>
+          <a class="material-button material-button-ghost" href="{{ url_for('finance.finance_excel_report') }}">
+            <span class="material-symbols-rounded text-[20px]">table</span>
+            <span>Excel</span>
+          </a>
+          <a class="material-button material-button-ghost" href="{{ url_for('finance.finance_pdf_report') }}">
+            <span class="material-symbols-rounded text-[20px]">picture_as_pdf</span>
+            <span>PDF</span>
+          </a>
+          <button class="material-button material-button-ghost" type="button" data-print-page>
+            <span class="material-symbols-rounded text-[20px]">print</span>
+            <span>Print</span>
+          </button>
+          {% if g.user["role"] == "super_admin" %}
+            <a class="material-button material-button-ghost" href="{{ url_for('finance.recycle_bin') }}">
+              <span class="material-symbols-rounded text-[20px]">recycling</span>
+              <span>Recycle bin{% if deleted_slips %} ({{ deleted_slips }}){% endif %}</span>
+            </a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </section>
+
+    {% if can_manage_finance and summary %}
+      <section class="dashboard-grid">
+        <article class="metric-card">
+          <span class="material-symbols-rounded">receipt_long</span>
+          <strong>{{ summary.slip_count }}</strong>
+          <small>Total slips</small>
+        </article>
+        <article class="metric-card">
+          <span class="material-symbols-rounded">payments</span>
+          <strong>{{ summary.total_money }}</strong>
+          <small>Total captured</small>
+        </article>
+        <article class="metric-card">
+          <span class="material-symbols-rounded">volunteer_activism</span>
+          <strong>{{ summary.offering_money }}</strong>
+          <small>Offerings captured</small>
+        </article>
+        <article class="metric-card">
+          <span class="material-symbols-rounded">visibility</span>
+          <strong>{{ summary.visible_count }}</strong>
+          <small>Visible now</small>
+        </article>
+        <article class="metric-card">
+          <span class="material-symbols-rounded">approval</span>
+          <strong>{{ summary.pending_count }}</strong>
+          <small>Pending approval</small>
+        </article>
+        <article class="metric-card">
+          <span class="material-symbols-rounded">timer_off</span>
+          <strong>{{ summary.expired_count }}</strong>
+          <small>Expired windows</small>
+        </article>
+      </section>
+
+      <section class="chart-panel">
+        <div>
+          <p class="text-xs font-black uppercase text-btg-gold">Finance trend</p>
+          <h2 class="text-2xl font-black">Monthly deposits</h2>
+        </div>
+        <div class="bar-chart" style="--max-value: {{ summary.max_monthly_cents or 1 }}">
+          {% for month in summary.monthly %}
+            <span class="bar-chart-item" style="--value: {{ month['cents'] or 1 }}">
+              <i></i>
+              <small>{{ month["month"] }}</small>
+            </span>
+          {% else %}
+            <p class="text-btg-muted">No deposit data yet.</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="analytics-grid">
+        <article class="chart-panel">
+          <div>
+            <p class="text-xs font-black uppercase text-btg-gold">Visibility</p>
+            <h2 class="text-2xl font-black">Slip status</h2>
+          </div>
+          <div class="insight-bars" style="--max-value: {{ summary.max_status_count or 1 }}">
+            {% for item in summary.status_breakdown %}
+              <span style="--value: {{ item.count or 0 }}">
+                <strong>{{ item.label }}</strong>
+                <i></i>
+                <em>{{ item.count }}</em>
+              </span>
+            {% endfor %}
+          </div>
+        </article>
+        <article class="chart-panel">
+          <div>
+            <p class="text-xs font-black uppercase text-btg-gold">Banks</p>
+            <h2 class="text-2xl font-black">Captured by bank</h2>
+          </div>
+          <div class="insight-bars finance-money-bars" style="--max-value: {{ summary.max_bank_cents or 1 }}">
+            {% for bank in summary.by_bank %}
+              <span style="--value: {{ bank['cents'] or 0 }}">
+                <strong>{{ bank["label"] }}</strong>
+                <i></i>
+                <em>{{ cents_to_money(bank["cents"]) }}</em>
+              </span>
+            {% else %}
+              <p class="text-btg-muted">No bank data yet.</p>
+            {% endfor %}
+          </div>
+        </article>
+        <article class="chart-panel">
+          <div>
+            <p class="text-xs font-black uppercase text-btg-gold">Offerings</p>
+            <h2 class="text-2xl font-black">Offering types</h2>
+          </div>
+          <div class="insight-bars finance-money-bars" style="--max-value: {{ summary.max_offering_type_cents or 1 }}">
+            {% for item in summary.offering_types %}
+              <span style="--value: {{ item['cents'] or 0 }}">
+                <strong>{{ item["label"] }}</strong>
+                <i></i>
+                <em>{{ cents_to_money(item["cents"]) }}</em>
+              </span>
+            {% else %}
+              <p class="text-btg-muted">No offering data yet.</p>
+            {% endfor %}
+          </div>
+        </article>
+      </section>
+
+      {% if can_upload_finance %}
+        <section class="material-card grid gap-4 p-4">
+          <h2 class="text-2xl font-black">Capture offering</h2>
+          <form class="grid gap-4" method="post" action="{{ url_for('finance.create_offering_entry') }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+            <div class="grid gap-4 md:grid-cols-4">
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Date</span>
+                <input class="material-field" name="offering_date" type="date" value="{{ today }}" />
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Offering type</span>
+                <input class="material-field" name="offering_type" list="offering-types" placeholder="Tithe, Sunday, Youth..." required />
+                <datalist id="offering-types">
+                  <option value="Tithe"></option>
+                  <option value="Sunday offering"></option>
+                  <option value="Youth offering"></option>
+                  <option value="Missions"></option>
+                  <option value="Building fund"></option>
+                  <option value="Thanksgiving"></option>
+                </datalist>
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Amount</span>
+                <input class="material-field" name="amount" inputmode="decimal" placeholder="R 0.00" required />
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Link deposit slip</span>
+                <select class="material-field" name="deposit_slip_id">
+                  <option value="">Not linked yet</option>
+                  {% for slip in slip_options %}
+                    <option value="{{ slip['id'] }}">{{ slip["deposit_date"] }} - {{ slip["title"] }} - {{ cents_to_money(slip["amount_cents"]) }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Note</span>
+              <input class="material-field" name="note" placeholder="Optional detail" />
+            </label>
+            <button class="material-button material-button-filled w-full" type="submit">
+              <span class="material-symbols-rounded text-[20px]">add_card</span>
+              <span>Capture offering</span>
+            </button>
+          </form>
+        </section>
+
+        <section class="material-card grid gap-4 p-4">
+          <h2 class="text-2xl font-black">Upload deposit slip</h2>
+          <form class="grid gap-4" method="post" action="{{ url_for('finance.create_slip') }}" enctype="multipart/form-data">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Title</span>
+              <input class="material-field" name="title" required />
+            </label>
+            <div class="grid gap-4 md:grid-cols-3">
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Bank</span>
+                <input class="material-field" name="bank_name" />
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Reference</span>
+                <input class="material-field" name="reference" />
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Amount</span>
+                <input class="material-field" name="amount" inputmode="decimal" placeholder="R 0.00" />
+              </label>
+            </div>
+            <div class="grid gap-4 md:grid-cols-3">
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Deposit date</span>
+                <input class="material-field" name="deposit_date" type="date" value="{{ today }}" />
+              </label>
+              <label class="remember-option md:col-span-1">
+                <input name="is_visible" type="checkbox" />
+                <span class="remember-box">
+                  <span class="material-symbols-rounded">done</span>
+                </span>
+                <span>
+                  <strong>Visible to all</strong>
+                  <small>Requires admin or pastor approval first.</small>
+                </span>
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-bold text-btg-muted">Visible until</span>
+                <input class="material-field" name="visible_until" type="datetime-local" />
+              </label>
+            </div>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Deposit slip</span>
+              <input class="material-field file:mr-4 file:rounded-md file:border-0 file:bg-btg-green file:px-4 file:py-2 file:font-bold file:text-white" name="deposit_slip" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required />
+            </label>
+            <button class="material-button material-button-filled w-full" type="submit">
+              <span class="material-symbols-rounded text-[20px]">upload_file</span>
+              <span>Upload slip</span>
+            </button>
+          </form>
+        </section>
+      {% endif %}
+    {% endif %}
+
+    {% if can_manage_finance and offerings %}
+      <section class="grid gap-3">
+        <p class="text-xs font-black uppercase text-btg-gold">Recent offerings</p>
+        {% for offering in offerings %}
+          <article class="material-card grid gap-3 p-4">
+            <span class="grid min-w-0 gap-1">
+              <strong class="truncate">{{ offering["offering_type"] }} - {{ cents_to_money(offering["amount_cents"]) }}</strong>
+              <small class="truncate text-btg-muted">
+                {{ offering["offering_date"] | pretty_date }} by {{ offering["captured_by_name"] }}
+                {% if offering["deposit_slip_title"] %} - linked to {{ offering["deposit_slip_title"] }}{% endif %}
+              </small>
+            </span>
+            {% if can_upload_finance %}
+              <form class="offering-link-form" method="post" action="{{ url_for('finance.link_offering_slip', offering_id=offering['id']) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <select class="material-field" name="deposit_slip_id" aria-label="Link offering to deposit slip">
+                  <option value="">Choose slip</option>
+                  {% for slip in slip_options %}
+                    <option value="{{ slip['id'] }}" {% if offering["deposit_slip_id"] == slip["id"] %}selected{% endif %}>{{ slip["deposit_date"] }} - {{ slip["title"] }}</option>
+                  {% endfor %}
+                </select>
+                <button class="material-button material-button-tonal" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">link</span>
+                  <span>Link slip</span>
+                </button>
+              </form>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </section>
+    {% endif %}
+
+    <section class="grid gap-3">
+      <p class="text-xs font-black uppercase text-btg-gold">{{ "All slips" if can_manage_finance else "Visible slips" }}</p>
+      {% for slip in slips %}
+        <article
+          class="material-card grid gap-4 p-4"
+          data-finance-slip
+          data-visible-until="{{ slip['visible_until'] or '' }}"
+          data-finance-hide-on-expiry="{{ '0' if can_manage_finance else '1' }}"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <span class="grid min-w-0 gap-1">
+              <strong class="truncate">{{ slip["title"] }}</strong>
+              <small class="truncate text-btg-muted">{{ slip["bank_name"] or "Bank" }} - {{ slip["deposit_date"] | pretty_date }}</small>
+            </span>
+            <em class="material-chip not-italic">{{ cents_to_money(slip["amount_cents"]) }}</em>
+          </div>
+          <p class="text-sm text-btg-muted">
+            Reference: {{ slip["reference"] or "Not added" }}
+            {% if can_manage_finance %}
+              - Status: {{ slip["approval_status"] }}
+              -
+              {% if slip["is_visible"] and slip["visible_until"] %}
+                Visible until {{ slip["visible_until"] | chat_timestamp }}
+              {% elif slip["approval_status"] == "approved" and slip["visible_until"] %}
+                Expired or revoked
+              {% else %}
+                Not visible to members
+              {% endif %}
+            {% endif %}
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <a class="material-button material-button-tonal" href="{{ url_for('finance.view_slip', slip_id=slip['id']) }}">
+              <span class="material-symbols-rounded text-[20px]">visibility</span>
+              <span>View slip</span>
+            </a>
+            {% if can_upload_finance %}
+              <button
+                class="material-button material-button-tonal"
+                type="button"
+                data-finance-edit-toggle
+                aria-controls="finance-edit-{{ slip['id'] }}"
+                aria-expanded="false"
+              >
+                <span class="material-symbols-rounded text-[20px]">edit</span>
+                <span>Edit</span>
+              </button>
+            {% endif %}
+            {% if can_approve_finance and slip["approval_status"] == "pending" %}
+              <form method="post" action="{{ url_for('finance.approve_slip', slip_id=slip['id']) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <button class="material-button material-button-filled" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">approval</span>
+                  <span>Approve</span>
+                </button>
+              </form>
+              <form method="post" action="{{ url_for('finance.reject_slip', slip_id=slip['id']) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <button class="material-button material-button-tonal danger-action" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">block</span>
+                  <span>Reject</span>
+                </button>
+              </form>
+            {% endif %}
+            {% if can_manage_finance and slip["is_visible"] %}
+              <form method="post" action="{{ url_for('finance.revoke_slip', slip_id=slip['id']) }}" data-confirm-action="Revoke member visibility for this deposit slip?">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <button class="material-button material-button-tonal danger-action" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">visibility_off</span>
+                  <span>Revoke view</span>
+                </button>
+              </form>
+            {% endif %}
+            {% if g.user["role"] == "super_admin" %}
+              <form method="post" action="{{ url_for('finance.delete_slip', slip_id=slip['id']) }}" data-confirm-action="Move this deposit slip to the recycle bin?">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <button class="material-button material-button-tonal danger-action" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">delete</span>
+                  <span>Delete</span>
+                </button>
+              </form>
+            {% endif %}
+          </div>
+          {% if can_upload_finance %}
+            <form
+              id="finance-edit-{{ slip['id'] }}"
+              class="finance-edit-form hidden"
+              method="post"
+              action="{{ url_for('finance.edit_slip', slip_id=slip['id']) }}"
+              data-finance-edit-form
+            >
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+              <div class="grid gap-3 md:grid-cols-2">
+                <label class="grid gap-2">
+                  <span class="text-sm font-bold text-btg-muted">Title</span>
+                  <input class="material-field" name="title" value="{{ slip['title'] }}" required />
+                </label>
+                <label class="grid gap-2">
+                  <span class="text-sm font-bold text-btg-muted">Bank</span>
+                  <input class="material-field" name="bank_name" value="{{ slip['bank_name'] or '' }}" />
+                </label>
+              </div>
+              <div class="grid gap-3 md:grid-cols-3">
+                <label class="grid gap-2">
+                  <span class="text-sm font-bold text-btg-muted">Reference</span>
+                  <input class="material-field" name="reference" value="{{ slip['reference'] or '' }}" />
+                </label>
+                <label class="grid gap-2">
+                  <span class="text-sm font-bold text-btg-muted">Amount</span>
+                  <input class="material-field" name="amount" inputmode="decimal" value="{{ cents_to_money(slip['amount_cents']).replace('R ', '').replace(',', '') }}" />
+                </label>
+                <label class="grid gap-2">
+                  <span class="text-sm font-bold text-btg-muted">Deposit date</span>
+                  <input class="material-field" name="deposit_date" type="date" value="{{ slip['deposit_date'] or today }}" />
+                </label>
+              </div>
+              <div class="grid gap-3 md:grid-cols-2">
+                <label class="remember-option">
+                  <input name="is_visible" type="checkbox" {% if slip["is_visible"] %}checked{% endif %} />
+                  <span class="remember-box">
+                    <span class="material-symbols-rounded">done</span>
+                  </span>
+                  <span>
+                    <strong>Visible to all</strong>
+                    <small>Editing sends the visibility request for approval again.</small>
+                  </span>
+                </label>
+                <label class="grid gap-2">
+                  <span class="text-sm font-bold text-btg-muted">Visible until</span>
+                  <input class="material-field" name="visible_until" type="datetime-local" value="{{ (slip['visible_until'] or '')[:16] }}" />
+                </label>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button class="material-button material-button-filled" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">save</span>
+                  <span>Save changes</span>
+                </button>
+                <button class="material-button material-button-tonal" type="button" data-finance-edit-cancel>
+                  <span class="material-symbols-rounded text-[20px]">close</span>
+                  <span>Cancel</span>
+                </button>
+              </div>
+            </form>
+          {% endif %}
+        </article>
+      {% endfor %}
+      <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted {% if slips %}hidden{% endif %}" data-finance-empty>
+        No deposit slips are visible right now.
+      </article>
+      {% include "partials/pagination.html" %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

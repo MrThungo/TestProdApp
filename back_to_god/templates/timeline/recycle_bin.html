@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Timeline recycle bin | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="timeline-shell">
+    {% include "partials/flash.html" %}
+
+    <section class="timeline-hero">
+      <div>
+        <p class="mb-2 text-xs font-black uppercase text-btg-gold">Church life</p>
+        <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Recycle bin</h1>
+        <p class="mt-4 max-w-2xl leading-7 text-btg-muted">
+          Deleted timeline posts are kept here so they can be restored without losing their photos, videos, comments, or reactions.
+        </p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <a class="material-button material-button-tonal" href="{{ url_for('timeline.index') }}">
+            <span class="material-symbols-rounded text-[20px]">photo_library</span>
+            <span>Timeline</span>
+          </a>
+          <a class="material-button material-button-filled" href="{{ url_for('timeline.recycle_bin') }}">
+            <span class="material-symbols-rounded text-[20px]">delete</span>
+            <span>Recycle bin{% if deleted_posts %} ({{ deleted_posts }}){% endif %}</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="timeline-feed">
+      {% for post in posts %}
+        <article class="material-card recycle-post-card">
+          <header class="timeline-post-header">
+            <span class="message-avatar fallback">{{ post["author_name"][:1] }}</span>
+            <span class="grid min-w-0">
+              <strong class="truncate">{{ post["title"] }}</strong>
+              <small class="text-btg-muted">
+                Deleted {{ post["deleted_at"] | chat_timestamp }} by {{ post["deleted_by_name"] or "System" }}
+              </small>
+            </span>
+          </header>
+          <div class="grid gap-3 px-4 pb-4">
+            <p class="text-sm text-btg-muted">
+              Posted by <strong>{{ post["author_name"] }}</strong>
+              {% if post["event_date"] %} for {{ post["event_date"] | chat_timestamp }}{% endif %}.
+            </p>
+            {% if post["body"] %}
+              <p class="leading-7 text-btg-muted">{{ post["body"] }}</p>
+            {% endif %}
+            <div class="flex flex-wrap gap-2">
+              <span class="material-chip">{{ post["image_count"] }} photos</span>
+              <span class="material-chip">{{ post["video_count"] }} videos</span>
+              <span class="material-chip">{{ post["media_count"] }} media items</span>
+            </div>
+            <form method="post" action="{{ url_for('timeline.restore', post_id=post['id']) }}">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+              <button class="material-button material-button-filled w-full" type="submit">
+                <span class="material-symbols-rounded text-[20px]">restore</span>
+                <span>Restore post</span>
+              </button>
+            </form>
+          </div>
+        </article>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          Timeline recycle bin is empty.
+        </article>
+      {% endfor %}
+      {% include "partials/pagination.html" %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

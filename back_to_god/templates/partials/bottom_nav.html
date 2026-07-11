@@ -1,0 +1,19 @@
+<nav class="bottom-nav" aria-label="Primary">
+  <a class="material-nav-item {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
+    <span class="material-symbols-rounded text-[21px]">home</span>
+    <span>Home</span>
+  </a>
+  <a class="material-nav-item {% if request.endpoint.startswith('live.') %}active{% endif %}" href="{{ url_for('live.index') }}">
+    <span class="material-symbols-rounded text-[21px]">live_tv</span>
+    <span>Live</span>
+  </a>
+  <a class="material-nav-item {% if request.endpoint.startswith('timeline.') %}active{% endif %}" href="{{ url_for('timeline.index') }}">
+    <span class="material-symbols-rounded text-[21px]">photo_library</span>
+    <span>Timeline</span>
+  </a>
+  <a class="material-nav-item {% if request.endpoint.startswith('messages.') %}active{% endif %}" href="{{ url_for('messages.index') }}">
+    <span class="material-symbols-rounded text-[21px]">chat_bubble</span>
+    <span>Chat</span>
+    <em class="bottom-nav-badge {% if not g.unread_messages %}hidden{% endif %}" data-message-count>{{ g.unread_messages or 0 }}</em>
+  </a>
+</nav>

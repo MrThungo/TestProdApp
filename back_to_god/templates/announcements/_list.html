@@ -1,0 +1,67 @@
+<section
+  class="announcement-list"
+  data-live-fragment
+  data-live-fragment-url="{{ url_for('announcements.poll') }}"
+  data-live-latest="{{ latest_update|default('') }}"
+>
+  {% for announcement in announcements %}
+    <article class="announcement-card" id="announcement-{{ announcement['id'] }}">
+      <header>
+        <span class="announcement-icon">
+          <span class="material-symbols-rounded">campaign</span>
+        </span>
+        <span class="grid min-w-0 gap-1">
+          <strong>{{ announcement["title"] }}</strong>
+          <small class="text-btg-muted">
+            {{ announcement["created_at"] | chat_timestamp }} by {{ announcement["author_name"] }}
+          </small>
+        </span>
+        {% if announcement["is_pinned"] %}
+          <em class="announcement-pin">Pinned</em>
+        {% endif %}
+      </header>
+      <dl class="announcement-meta">
+        {% if announcement["event_at"] %}
+          <div>
+            <dt>Date and time</dt>
+            <dd>{{ announcement["event_at"] | chat_timestamp }}</dd>
+          </div>
+        {% endif %}
+        {% if announcement["reminder_at"] %}
+          <div>
+            <dt>Reminder</dt>
+            <dd>
+              {{ announcement["reminder_at"] | chat_timestamp }}
+              {% if announcement["reminder_sent_at"] %}<span>Sent</span>{% endif %}
+            </dd>
+          </div>
+        {% endif %}
+      </dl>
+      <p>{{ announcement["body"] }}</p>
+      {% if can_post_announcements %}
+        <div class="announcement-actions">
+          <form method="post" action="{{ url_for('announcements.pin', announcement_id=announcement['id']) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="is_pinned" value="{{ 0 if announcement['is_pinned'] else 1 }}" />
+            <button class="material-button material-button-tonal" type="submit">
+              <span class="material-symbols-rounded text-[20px]">{{ "keep_off" if announcement["is_pinned"] else "push_pin" }}</span>
+              <span>{{ "Unpin" if announcement["is_pinned"] else "Pin" }}</span>
+            </button>
+          </form>
+          <form method="post" action="{{ url_for('announcements.delete', announcement_id=announcement['id']) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+            <button class="material-button material-button-tonal" type="submit">
+              <span class="material-symbols-rounded text-[20px]">delete</span>
+              <span>Remove</span>
+            </button>
+          </form>
+        </div>
+      {% endif %}
+    </article>
+  {% else %}
+    <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+      No announcements have been posted yet.
+    </article>
+  {% endfor %}
+  {% include "partials/pagination.html" %}
+</section>
