@@ -18,6 +18,12 @@ def _load_local_env() -> None:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip().strip('"').strip("'")
+        normalized_value = value.replace("\\", "/")
+        var_data_unavailable = os.name == "nt" or not Path("/var/data").exists()
+        if key in {"INSTANCE_DIR", "DATABASE_PATH"} and normalized_value.startswith("/var/data") and var_data_unavailable:
+            continue
+        if key == "DATABASE_URL" and "sqlite:////var/data" in normalized_value and var_data_unavailable:
+            continue
         if key:
             os.environ.setdefault(key, value)
 
