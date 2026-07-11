@@ -5,6 +5,26 @@ from datetime import timedelta
 from pathlib import Path
 
 
+def _load_local_env() -> None:
+    project_root = Path(__file__).resolve().parent.parent
+    env_path = project_root / ".env"
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
+
+
+_load_local_env()
+
+
 class Config:
     PROJECT_ROOT = Path(__file__).resolve().parent.parent
     INSTANCE_DIR = Path(os.environ.get("INSTANCE_DIR", PROJECT_ROOT / "instance")).resolve()
@@ -21,11 +41,13 @@ class Config:
     INITIAL_SUPER_ADMIN_PASSWORD = os.environ.get("INITIAL_SUPER_ADMIN_PASSWORD", "")
     EXTERNAL_NOTIFICATION_API_KEY = os.environ.get("EXTERNAL_NOTIFICATION_API_KEY", "")
     EMAIL_FROM = os.environ.get("EMAIL_FROM", "no-reply@backtogod.local")
+    EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "No-Reply@CityCentreAOG")
     SMTP_HOST = os.environ.get("SMTP_HOST", "")
     SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
     SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
     SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
     SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "1") == "1"
+    SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "") == "1"
     ENABLE_QUICK_LOGIN = os.environ.get("ENABLE_QUICK_LOGIN", "1") == "1"
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)
     SESSION_COOKIE_HTTPONLY = True

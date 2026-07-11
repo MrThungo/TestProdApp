@@ -47,13 +47,25 @@
             Emergency: <strong>{{ user["emergency_contact_name"] or "Not added" }}</strong>
             {% if user["emergency_contact_phone"] %} - {{ user["emergency_contact_phone"] }}{% endif %}
           </p>
-          <form method="post" action="{{ url_for('users.restore', user_id=user['id']) }}">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
-            <button class="material-button material-button-filled" type="submit">
-              <span class="material-symbols-rounded text-[20px]">restore</span>
-              <span>Restore</span>
-            </button>
-          </form>
+          {% set can_touch = g.user["role"] == "super_admin" or (g.user["role"] == "admin" and user["role"] != "super_admin") %}
+          {% if can_touch %}
+            <div class="flex flex-wrap gap-2">
+              <form method="post" action="{{ url_for('users.restore', user_id=user['id']) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <button class="material-button material-button-filled" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">restore</span>
+                  <span>Restore</span>
+                </button>
+              </form>
+              <form method="post" action="{{ url_for('users.permanent_delete', user_id=user['id']) }}" data-confirm-action="Permanently delete this user account? This cannot be undone.">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <button class="material-button material-button-tonal danger-action" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">delete_forever</span>
+                  <span>Delete forever</span>
+                </button>
+              </form>
+            </div>
+          {% endif %}
         </article>
       {% else %}
         <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">

@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Visitor feedback | Back to God AOG{% endblock %}
+
+{% block page %}
+  <header class="app-topbar">
+    <a class="app-brand" href="{{ url_for('public.landing') }}" aria-label="Back to home">
+      <span class="app-brand-mark">B</span>
+      <span class="app-brand-copy">
+        <strong>Back to God AOG</strong>
+        <small>Visitor card</small>
+      </span>
+    </a>
+    <nav class="app-topbar-actions" aria-label="Visitor actions">
+      {% include "partials/theme_toggle.html" %}
+      <a class="material-button material-button-tonal" href="{{ url_for('auth.login') }}">
+        <span class="material-symbols-rounded text-[20px]">login</span>
+        <span>Sign in</span>
+      </a>
+    </nav>
+  </header>
+
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[920px] gap-6 pb-20 pt-6">
+    {% include "partials/flash.html" %}
+
+    <section>
+      <a class="material-button material-button-tonal w-fit" href="{{ url_for('public.landing') }}">
+        <span class="material-symbols-rounded text-[20px]">arrow_back</span>
+        <span>Back</span>
+      </a>
+      <p class="mb-1 text-xs font-black uppercase text-btg-gold">Welcome</p>
+      <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Visitor card</h1>
+      <p class="mt-3 max-w-2xl leading-7 text-btg-muted">
+        Share your visit details, service feedback, and whether you would like church follow-up.
+      </p>
+    </section>
+
+    <section class="material-card grid gap-4 p-4">
+      <form class="grid gap-4" method="post" action="{{ url_for('public.visitor_feedback') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+        <label class="grid gap-2">
+          <span class="text-sm font-bold text-btg-muted">Full name</span>
+          <input class="material-field" name="full_name" autocomplete="name" required />
+        </label>
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Phone / WhatsApp</span>
+            <input class="material-field" name="phone" autocomplete="tel" />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Email</span>
+            <input class="material-field" name="email" type="email" autocomplete="email" />
+          </label>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Visit date</span>
+            <input class="material-field" name="visit_date" type="date" value="{{ today }}" />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Visit type</span>
+            <select class="material-field" name="visit_type">
+              <option>First time</option>
+              <option>Returning visitor</option>
+              <option>Invited guest</option>
+              <option>New to the city</option>
+            </select>
+          </label>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Age group</span>
+            <select class="material-field" name="age_group">
+              <option>Adult</option>
+              <option>Youth</option>
+              <option>Child</option>
+              <option>Senior</option>
+              <option>Family</option>
+            </select>
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Invited by</span>
+            <input class="material-field" name="invited_by" />
+          </label>
+        </div>
+        <label class="grid gap-2">
+          <span class="text-sm font-bold text-btg-muted">Home area</span>
+          <input class="material-field" name="home_area" />
+        </label>
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Identity type</span>
+            <select class="material-field" name="identity_type" data-identity-type>
+              <option value="sa_id">South African ID</option>
+              <option value="foreign">Foreign national</option>
+            </select>
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">SA ID number</span>
+            <input class="material-field" name="id_number" inputmode="numeric" maxlength="13" data-id-number data-dob-target="#visitor_feedback_dob" />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Passport / permit number</span>
+            <input class="material-field" name="foreign_id_number" />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Nationality</span>
+            <input class="material-field" name="nationality" autocomplete="country-name" />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Date of birth</span>
+            <input class="material-field" id="visitor_feedback_dob" name="date_of_birth" type="date" />
+          </label>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">How was the service?</span>
+            <select class="material-field" name="service_rating">
+              <option value="">Choose one</option>
+              <option>Excellent</option>
+              <option>Good</option>
+              <option>Okay</option>
+              <option>Needs care</option>
+            </select>
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-bold text-btg-muted">Prayer request</span>
+            <textarea class="material-field" name="prayer_request" rows="3"></textarea>
+          </label>
+        </div>
+        <label class="grid gap-2">
+          <span class="text-sm font-bold text-btg-muted">Service feedback</span>
+          <textarea class="material-field" name="service_feedback" rows="4"></textarea>
+        </label>
+        <label class="grid grid-cols-[22px_1fr] items-center gap-2">
+          <input class="h-[18px] min-h-[18px] w-[18px] accent-btg-green" name="follow_up_requested" type="checkbox" />
+          <span class="text-sm font-bold text-btg-muted">I would like follow-up from the church.</span>
+        </label>
+        <label class="grid grid-cols-[22px_1fr] items-center gap-2">
+          <input class="h-[18px] min-h-[18px] w-[18px] accent-btg-green" name="membership_requested" type="checkbox" />
+          <span class="text-sm font-bold text-btg-muted">I would like to become a member of the church.</span>
+        </label>
+        <label class="grid grid-cols-[22px_1fr] items-center gap-2">
+          <input class="h-[18px] min-h-[18px] w-[18px] accent-btg-green" name="consent_to_contact" type="checkbox" checked />
+          <span class="text-sm font-bold text-btg-muted">The church may contact me about this visit.</span>
+        </label>
+        <button class="material-button material-button-filled w-full" type="submit">
+          <span class="material-symbols-rounded text-[20px]">send</span>
+          <span>Submit visitor card</span>
+        </button>
+      </form>
+    </section>
+  </main>
+{% endblock %}

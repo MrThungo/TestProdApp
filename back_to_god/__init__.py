@@ -174,9 +174,15 @@ def register_request_hooks(app: Flask) -> None:
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        camera_policy = "camera=(self)" if request.endpoint == "live.studio" else "camera=()"
+        microphone_policy = (
+            "microphone=(self)"
+            if request.endpoint in {"live.studio", "messages.thread"}
+            else "microphone=()"
+        )
         response.headers.setdefault(
             "Permissions-Policy",
-            "geolocation=(), camera=(self), microphone=(self), fullscreen=(self)",
+            f"geolocation=(), {camera_policy}, {microphone_policy}, fullscreen=(self)",
         )
         response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
         response.headers.setdefault(
@@ -230,6 +236,7 @@ def register_blueprints(app: Flask) -> None:
     from .modules.finance.routes import bp as finance_bp
     from .modules.gallery.routes import bp as gallery_bp
     from .modules.live.routes import bp as live_bp
+    from .modules.members.routes import bp as members_bp
     from .modules.messages.routes import bp as messages_bp
     from .modules.notifications.routes import bp as notifications_bp
     from .modules.profile.routes import bp as profile_bp
@@ -248,6 +255,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(finance_bp)
     app.register_blueprint(gallery_bp)
     app.register_blueprint(live_bp)
+    app.register_blueprint(members_bp)
     app.register_blueprint(messages_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(profile_bp)

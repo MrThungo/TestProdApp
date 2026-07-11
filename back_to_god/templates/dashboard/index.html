@@ -56,6 +56,20 @@
             <small>Open follow-ups</small>
           </article>
         {% endif %}
+        {% if show_member_tracking and not show_user_counts %}
+          <article class="metric-card">
+            <span class="material-symbols-rounded">groups</span>
+            <strong>{{ counts.members }}</strong>
+            <small>Members</small>
+          </article>
+        {% endif %}
+        {% if show_member_tracking %}
+          <article class="metric-card">
+            <span class="material-symbols-rounded">how_to_reg</span>
+            <strong>{{ counts.membership_requests }}</strong>
+            <small>Member requests</small>
+          </article>
+        {% endif %}
         <article class="metric-card">
           <span class="material-symbols-rounded">live_tv</span>
           <strong>{{ counts.live_now }}</strong>
@@ -180,6 +194,14 @@
             <span class="text-xs font-black uppercase text-btg-gold">Hospitality</span>
             <strong>Capture visitors</strong>
             <small class="text-btg-muted">{{ counts.visitor_followups }} open follow-ups</small>
+          </a>
+        {% endif %}
+        {% if show_member_tracking %}
+          <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('members.index') }}">
+            <span class="material-symbols-rounded text-btg-green">how_to_reg</span>
+            <span class="text-xs font-black uppercase text-btg-gold">Membership</span>
+            <strong>Track members</strong>
+            <small class="text-btg-muted">{{ counts.membership_requests }} pending requests</small>
           </a>
         {% endif %}
         <a class="material-card grid min-h-32 content-end gap-2 p-4 no-underline" href="{{ url_for('messages.index') }}">

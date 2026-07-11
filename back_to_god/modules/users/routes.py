@@ -25,6 +25,7 @@ from back_to_god.services.users import (
     list_users,
     normalize_foreign_id,
     normalize_identity_type,
+    permanently_delete_user,
     reset_password as reset_user_password,
     restore_user,
     set_active,
@@ -165,9 +166,12 @@ def index():
                     foreign_id_number,
                     nationality,
                 )
-                send_account_created_email(email, full_name, password)
+                email_sent = send_account_created_email(email, full_name, password)
                 log_event("user_created", g.user["id"], "user", None, email)
-                flash("Account created. The temporary password has been emailed.", "success")
+                if email_sent:
+                    flash("Account created. The temporary password has been emailed.", "success")
+                else:
+                    flash("Account created, but email could not be sent. Check the email outbox for the temporary password.", "warning")
                 return redirect(url_for("users.index"))
             except sqlite3.IntegrityError:
                 flash("An account with that email already exists.", "error")
@@ -228,9 +232,12 @@ def reset_password(user_id: int):
         abort(403)
 
     password = reset_user_password(user_id)
-    send_account_created_email(target["email"], target["full_name"], password)
+    email_sent = send_account_created_email(target["email"], target["full_name"], password)
     log_event("password_reset", g.user["id"], "user", user_id, target["email"])
-    flash("A new temporary password was emailed to the user.", "success")
+    if email_sent:
+        flash("A new temporary password was emailed to the user.", "success")
+    else:
+        flash("A new temporary password was created, but email could not be sent. Check the email outbox.", "warning")
     return redirect(url_for("users.index"))
 
 
@@ -313,7 +320,7 @@ def recycle_bin():
 def restore(user_id: int):
     validate_csrf()
     target = get_user_by_id(user_id)
-    if target is None:
+    if target is None or not target["deleted_at"]:
         abort(404)
     if not can_manage_user(target):
         abort(403)
@@ -321,4 +328,25 @@ def restore(user_id: int):
     restore_user(user_id)
     log_event("user_restored", g.user["id"], "user", user_id, target["email"])
     flash("Account restored.", "success")
+    return redirect(url_for("users.recycle_bin"))
+
+
+@bp.post("/<int:user_id>/permanent-delete")
+@role_required("super_admin", "admin")
+def permanent_delete(user_id: int):
+    validate_csrf()
+    if user_id == g.user["id"]:
+        flash("You cannot permanently delete your own account.", "error")
+        return redirect(url_for("users.recycle_bin"))
+
+    target = get_user_by_id(user_id)
+    if target is None or not target["deleted_at"]:
+        abort(404)
+    if not can_manage_user(target):
+        abort(403)
+
+    target_email = target["email"]
+    permanently_delete_user(user_id)
+    log_event("user_permanently_deleted", g.user["id"], "user", user_id, target_email)
+    flash("Account permanently deleted.", "success")
     return redirect(url_for("users.recycle_bin"))

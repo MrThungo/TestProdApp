@@ -7,9 +7,11 @@ from flask import abort, g, redirect, url_for
 
 from back_to_god.constants import (
     CAN_APPROVE_FINANCE_ROLES,
+    CAN_APPROVE_MEMBERSHIP_ROLES,
     CAN_CAPTURE_VISITOR_ROLES,
     CAN_GO_LIVE_ROLES,
     CAN_MANAGE_FINANCE_ROLES,
+    CAN_TRACK_MEMBERS_ROLES,
     CAN_UPLOAD_FINANCE_ROLES,
     MANAGED_BY_ADMIN_ROLES,
 )
@@ -64,6 +66,14 @@ def can_update_visitors() -> bool:
 
 def can_capture_visitors() -> bool:
     return g.user is not None and g.user["role"] in CAN_CAPTURE_VISITOR_ROLES
+
+
+def can_track_members() -> bool:
+    return g.user is not None and g.user["role"] in CAN_TRACK_MEMBERS_ROLES
+
+
+def can_approve_membership() -> bool:
+    return g.user is not None and g.user["role"] in CAN_APPROVE_MEMBERSHIP_ROLES
 
 
 def can_go_live() -> bool:

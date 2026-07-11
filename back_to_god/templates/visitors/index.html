@@ -19,12 +19,14 @@
       </p>
     </section>
 
-    <section class="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <section class="grid grid-cols-2 gap-3 md:grid-cols-6">
       {% for value, label, icon in [
         (visitor_counts.all, "total", "groups"),
         (visitor_counts.new, "new", "fiber_new"),
-        (visitor_counts.follow_up, "follow up", "phone_in_talk"),
-        (visitor_counts.connected, "connected", "verified")
+        (visitor_counts.follow_up, "requested", "phone_in_talk"),
+        (visitor_counts.follow_up_done, "followed up", "task_alt"),
+        (visitor_counts.connected, "connected", "verified"),
+        (visitor_counts.membership_pending, "member requests", "how_to_reg")
       ] %}
         <article class="material-card grid min-h-28 content-end p-4">
           <span class="material-symbols-rounded mb-3 text-btg-green">{{ icon }}</span>
@@ -118,9 +120,33 @@
             <span class="text-sm font-bold text-btg-muted">Prayer request</span>
             <textarea class="material-field" name="prayer_request" rows="3"></textarea>
           </label>
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">How was the service?</span>
+              <select class="material-field" name="service_rating">
+                <option value="">Choose one</option>
+                <option>Excellent</option>
+                <option>Good</option>
+                <option>Okay</option>
+                <option>Needs care</option>
+              </select>
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Service feedback</span>
+              <textarea class="material-field" name="service_feedback" rows="3"></textarea>
+            </label>
+          </div>
           <label class="grid gap-2">
             <span class="text-sm font-bold text-btg-muted">Notes</span>
             <textarea class="material-field" name="notes" rows="3"></textarea>
+          </label>
+          <label class="grid grid-cols-[22px_1fr] items-center gap-2">
+            <input class="h-[18px] min-h-[18px] w-[18px] accent-btg-green" name="follow_up_requested" type="checkbox" />
+            <span class="text-sm font-bold text-btg-muted">Follow-up was requested.</span>
+          </label>
+          <label class="grid grid-cols-[22px_1fr] items-center gap-2">
+            <input class="h-[18px] min-h-[18px] w-[18px] accent-btg-green" name="membership_requested" type="checkbox" />
+            <span class="text-sm font-bold text-btg-muted">They asked to become a member.</span>
           </label>
           <label class="grid grid-cols-[22px_1fr] items-center gap-2">
             <input class="h-[18px] min-h-[18px] w-[18px] accent-btg-green" name="consent_to_contact" type="checkbox" checked />
@@ -137,7 +163,7 @@
     <section class="grid gap-3">
       <p class="text-xs font-black uppercase text-btg-gold">Recent visitors</p>
       {% for visitor in visitors %}
-        <article class="material-card grid gap-4 p-4">
+        <article class="material-card grid gap-4 p-4" id="visitor-{{ visitor['id'] }}">
           <div class="flex items-center justify-between gap-3">
             <span class="grid min-w-0 gap-1">
               <strong class="truncate">{{ visitor["full_name"] }}</strong>
@@ -153,9 +179,30 @@
             <div><dt class="text-xs font-black uppercase text-btg-muted">Nationality</dt><dd class="font-semibold">{{ visitor["nationality"] or "Not added" }}</dd></div>
             <div><dt class="text-xs font-black uppercase text-btg-muted">DOB</dt><dd class="font-semibold">{{ visitor["date_of_birth"] or "Not added" }}</dd></div>
             <div><dt class="text-xs font-black uppercase text-btg-muted">Area</dt><dd class="font-semibold">{{ visitor["home_area"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Captured by</dt><dd class="font-semibold">{{ visitor["captured_by_name"] or "Visitor self-submission" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Service</dt><dd class="font-semibold">{{ visitor["service_rating"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Follow-up</dt><dd class="font-semibold">{{ "Requested" if visitor["follow_up_requested"] else "Not requested" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Membership</dt><dd class="font-semibold">{{ visitor["membership_status"].replace("_", " ").title() if visitor["membership_requested"] else "Not requested" }}</dd></div>
           </dl>
           {% if visitor["prayer_request"] %}
             <p class="leading-7 text-btg-muted"><strong>Prayer:</strong> {{ visitor["prayer_request"] }}</p>
+          {% endif %}
+          {% if visitor["service_feedback"] %}
+            <p class="leading-7 text-btg-muted"><strong>Service feedback:</strong> {{ visitor["service_feedback"] }}</p>
+          {% endif %}
+          {% if visitor["follow_up_made_at"] %}
+            <p class="leading-7 text-btg-muted">
+              <strong>Follow-up made:</strong>
+              {{ visitor["follow_up_made_at"] | pretty_date }} by {{ visitor["follow_up_by_name"] or "Unknown" }}.
+              {% if visitor["follow_up_notes"] %}{{ visitor["follow_up_notes"] }}{% endif %}
+            </p>
+          {% endif %}
+          {% if visitor["membership_requested"] %}
+            <p class="leading-7 text-btg-muted">
+              <strong>Membership:</strong>
+              {{ visitor["membership_status"].title() }}
+              {% if visitor["membership_requested_at"] %}since {{ visitor["membership_requested_at"] | pretty_date }}{% endif %}.
+            </p>
           {% endif %}
           {% if can_update_visitors %}
             <form class="flex flex-wrap items-center gap-2" method="post" action="{{ url_for('visitors.update_visitor_status', visitor_id=visitor['id']) }}">
@@ -165,8 +212,31 @@
                   <option value="{{ status }}" {% if visitor["follow_up_status"] == status %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
-              <button class="material-button material-button-tonal" type="submit">Update</button>
+              <button class="material-button material-button-tonal" type="submit">
+                <span class="material-symbols-rounded text-[20px]">sync</span>
+                <span>Update</span>
+              </button>
             </form>
+            {% if visitor["follow_up_requested"] and not visitor["follow_up_made_at"] %}
+              <form class="grid gap-2" method="post" action="{{ url_for('visitors.complete_follow_up', visitor_id=visitor['id']) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <textarea class="material-field" name="follow_up_notes" rows="2" placeholder="Follow-up notes"></textarea>
+                <button class="material-button material-button-filled" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">task_alt</span>
+                  <span>Mark follow-up made</span>
+                </button>
+              </form>
+            {% endif %}
+            {% if can_approve_membership and visitor["membership_status"] == "pending" %}
+              <form class="grid gap-2" method="post" action="{{ url_for('members.approve_request', visitor_id=visitor['id']) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <textarea class="material-field" name="membership_notes" rows="2" placeholder="Membership approval notes"></textarea>
+                <button class="material-button material-button-filled" type="submit">
+                  <span class="material-symbols-rounded text-[20px]">how_to_reg</span>
+                  <span>Accept as member</span>
+                </button>
+              </form>
+            {% endif %}
           {% endif %}
         </article>
       {% else %}

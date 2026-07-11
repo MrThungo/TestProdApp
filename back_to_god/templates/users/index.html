@@ -47,16 +47,19 @@
       </div>
     </section>
 
-    <form class="search-panel" method="get" action="{{ url_for('users.index') }}">
+    <form class="search-panel user-search-panel" method="get" action="{{ url_for('users.index') }}">
       <span class="material-symbols-rounded">search</span>
       <input name="q" value="{{ search_query }}" autocomplete="off" placeholder="Search name, email, phone, ID, nationality" />
-      <select name="role" aria-label="Filter by role">
+      <select class="search-select" name="role" aria-label="Filter by role">
         <option value="">All roles</option>
         {% for role, label in role_labels.items() %}
           <option value="{{ role }}" {% if role_filter == role %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
-      <button class="material-button material-button-filled" type="submit">Filter</button>
+      <button class="material-button material-button-filled" type="submit">
+        <span class="material-symbols-rounded text-[20px]">filter_alt</span>
+        <span>Filter</span>
+      </button>
     </form>
 
     <section class="user-analytics-grid">

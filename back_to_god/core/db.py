@@ -102,13 +102,30 @@ def init_db() -> None:
             home_area TEXT,
             prayer_request TEXT,
             notes TEXT,
+            service_rating TEXT,
+            service_feedback TEXT,
             consent_to_contact INTEGER NOT NULL DEFAULT 1,
             follow_up_status TEXT NOT NULL DEFAULT 'new'
                 CHECK (follow_up_status IN ('new', 'follow_up', 'connected', 'not_reached')),
+            follow_up_requested INTEGER NOT NULL DEFAULT 0,
+            follow_up_made_at TEXT,
+            follow_up_made_by INTEGER,
+            follow_up_notes TEXT,
+            membership_requested INTEGER NOT NULL DEFAULT 0,
+            membership_status TEXT NOT NULL DEFAULT 'none'
+                CHECK (membership_status IN ('none', 'pending', 'approved', 'declined')),
+            membership_requested_at TEXT,
+            membership_reviewed_at TEXT,
+            membership_reviewed_by INTEGER,
+            member_user_id INTEGER,
+            membership_notes TEXT,
             captured_by INTEGER,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            FOREIGN KEY (captured_by) REFERENCES users (id)
+            FOREIGN KEY (captured_by) REFERENCES users (id),
+            FOREIGN KEY (follow_up_made_by) REFERENCES users (id),
+            FOREIGN KEY (membership_reviewed_by) REFERENCES users (id),
+            FOREIGN KEY (member_user_id) REFERENCES users (id)
         );
 
         CREATE TABLE IF NOT EXISTS live_sessions (
@@ -418,6 +435,8 @@ def init_db() -> None:
             ON deposit_slips (is_visible, visible_until, deposit_date);
         CREATE INDEX IF NOT EXISTS idx_finance_offerings_date
             ON finance_offerings (deleted_at, offering_date, deposit_slip_id);
+        CREATE INDEX IF NOT EXISTS idx_visitors_membership_status
+            ON visitors (membership_status, membership_requested_at);
         """
     )
     db.commit()
@@ -500,10 +519,37 @@ def migrate_db() -> None:
         "foreign_id_number": "ALTER TABLE visitors ADD COLUMN foreign_id_number TEXT",
         "nationality": "ALTER TABLE visitors ADD COLUMN nationality TEXT",
         "date_of_birth": "ALTER TABLE visitors ADD COLUMN date_of_birth TEXT",
+        "service_rating": "ALTER TABLE visitors ADD COLUMN service_rating TEXT",
+        "service_feedback": "ALTER TABLE visitors ADD COLUMN service_feedback TEXT",
+        "follow_up_requested": "ALTER TABLE visitors ADD COLUMN follow_up_requested INTEGER NOT NULL DEFAULT 0",
+        "follow_up_made_at": "ALTER TABLE visitors ADD COLUMN follow_up_made_at TEXT",
+        "follow_up_made_by": "ALTER TABLE visitors ADD COLUMN follow_up_made_by INTEGER",
+        "follow_up_notes": "ALTER TABLE visitors ADD COLUMN follow_up_notes TEXT",
+        "membership_requested": "ALTER TABLE visitors ADD COLUMN membership_requested INTEGER NOT NULL DEFAULT 0",
+        "membership_status": "ALTER TABLE visitors ADD COLUMN membership_status TEXT NOT NULL DEFAULT 'none'",
+        "membership_requested_at": "ALTER TABLE visitors ADD COLUMN membership_requested_at TEXT",
+        "membership_reviewed_at": "ALTER TABLE visitors ADD COLUMN membership_reviewed_at TEXT",
+        "membership_reviewed_by": "ALTER TABLE visitors ADD COLUMN membership_reviewed_by INTEGER",
+        "member_user_id": "ALTER TABLE visitors ADD COLUMN member_user_id INTEGER",
+        "membership_notes": "ALTER TABLE visitors ADD COLUMN membership_notes TEXT",
     }
     for column, statement in visitor_migrations.items():
         if column not in existing_visitor_columns:
             db.execute(statement)
+    if "follow_up_requested" not in existing_visitor_columns:
+        db.execute(
+            """
+            UPDATE visitors
+            SET follow_up_requested = 1
+            WHERE follow_up_status = 'follow_up'
+            """
+        )
+    db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_visitors_membership_status
+            ON visitors (membership_status, membership_requested_at)
+        """
+    )
 
     existing_live_columns = {
         row["name"] for row in db.execute("PRAGMA table_info(live_sessions)").fetchall()

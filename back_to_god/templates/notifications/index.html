@@ -8,6 +8,10 @@
     {% include "partials/flash.html" %}
 
     <section>
+      <button class="material-button material-button-tonal w-fit" type="button" data-safe-back data-fallback-url="{{ url_for('dashboard.index') }}">
+        <span class="material-symbols-rounded text-[20px]">arrow_back</span>
+        <span>Back</span>
+      </button>
       <p class="mb-1 text-xs font-black uppercase text-btg-gold">Updates</p>
       <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Notifications</h1>
       <div class="mt-4 flex flex-wrap gap-2">

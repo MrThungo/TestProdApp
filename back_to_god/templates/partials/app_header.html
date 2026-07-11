@@ -41,10 +41,14 @@
             <strong>Users</strong>
           </a>
         {% endif %}
-        {% if g.user["role"] in ["super_admin", "admin", "pastor", "usher"] %}
+        {% if g.user["role"] in ["super_admin", "admin", "pastor"] %}
           <a href="{{ url_for('visitors.index') }}">
             <span class="material-symbols-rounded">diversity_3</span>
             <strong>Visitors</strong>
+          </a>
+          <a href="{{ url_for('members.index') }}">
+            <span class="material-symbols-rounded">how_to_reg</span>
+            <strong>Members</strong>
           </a>
         {% endif %}
         <a href="{{ url_for('gallery.index') }}">

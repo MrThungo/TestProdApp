@@ -17,6 +17,9 @@
       data-engagement-url="{{ url_for('live.engagement', live_id=live['id']) }}"
     >
       <div class="live-video-frame">
+        <a class="media-back-float" href="{{ url_for('live.index') }}" aria-label="Back to live">
+          <span class="material-symbols-rounded">arrow_back</span>
+        </a>
         <video data-live-local autoplay muted playsinline></video>
         <div class="live-empty-state" data-live-empty>
           <span class="material-symbols-rounded">videocam</span>

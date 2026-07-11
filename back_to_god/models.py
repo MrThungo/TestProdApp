@@ -69,6 +69,10 @@ if SQLALCHEMY_AVAILABLE:
                 "follow_up_status IN ('new', 'follow_up', 'connected', 'not_reached')",
                 name="ck_visitors_follow_up_status",
             ),
+            CheckConstraint(
+                "membership_status IN ('none', 'pending', 'approved', 'declined')",
+                name="ck_visitors_membership_status",
+            ),
         )
 
         id = Column(Integer, primary_key=True)
@@ -87,8 +91,21 @@ if SQLALCHEMY_AVAILABLE:
         home_area = Column(String(120))
         prayer_request = Column(Text)
         notes = Column(Text)
+        service_rating = Column(String(40))
+        service_feedback = Column(Text)
         consent_to_contact = Column(Integer, nullable=False, default=1)
         follow_up_status = Column(String(40), nullable=False, default="new")
+        follow_up_requested = Column(Integer, nullable=False, default=0)
+        follow_up_made_at = Column(String(40))
+        follow_up_made_by = Column(Integer, ForeignKey("users.id"))
+        follow_up_notes = Column(Text)
+        membership_requested = Column(Integer, nullable=False, default=0)
+        membership_status = Column(String(40), nullable=False, default="none")
+        membership_requested_at = Column(String(40))
+        membership_reviewed_at = Column(String(40))
+        membership_reviewed_by = Column(Integer, ForeignKey("users.id"))
+        member_user_id = Column(Integer, ForeignKey("users.id"))
+        membership_notes = Column(Text)
         captured_by = Column(Integer, ForeignKey("users.id"))
         created_at = Column(String(40), nullable=False)
         updated_at = Column(String(40), nullable=False)

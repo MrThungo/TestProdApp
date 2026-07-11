@@ -2,10 +2,23 @@ from __future__ import annotations
 
 import smtplib
 from email.message import EmailMessage
+from email.utils import formataddr
 
 from flask import current_app
 
 from back_to_god.core.security import utc_now
+from back_to_god.core.validators import is_valid_email
+
+
+def _clean_config(value: object) -> str:
+    return str(value or "").strip().strip('"').strip("'")
+
+
+def _smtp_port() -> int:
+    try:
+        return int(current_app.config.get("SMTP_PORT", 587))
+    except (TypeError, ValueError):
+        return 587
 
 
 def send_email(to_email: str, subject: str, body: str) -> bool:
@@ -13,26 +26,42 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
     if not recipient:
         return False
 
+    username = _clean_config(current_app.config.get("SMTP_USERNAME", ""))
+    password = _clean_config(current_app.config.get("SMTP_PASSWORD", ""))
+    configured_sender = _clean_config(current_app.config.get("EMAIL_FROM", ""))
+    sender_name = _clean_config(current_app.config.get("EMAIL_FROM_NAME", "No-Reply@CityCentreAOG"))
+    sender_address = configured_sender if is_valid_email(configured_sender) else username
+    if username and configured_sender == "no-reply@backtogod.local":
+        sender_address = username
+    sender = formataddr((sender_name, sender_address)) if sender_name and sender_address else sender_address
+
     message = EmailMessage()
-    message["From"] = current_app.config["EMAIL_FROM"]
+    message["From"] = sender
     message["To"] = recipient
     message["Subject"] = subject
     message.set_content(body)
 
-    host = current_app.config.get("SMTP_HOST", "")
+    host = _clean_config(current_app.config.get("SMTP_HOST", ""))
+    delivery_error = ""
     if host:
+        port = _smtp_port()
+        use_ssl = bool(current_app.config.get("SMTP_USE_SSL")) or port == 465
         try:
-            with smtplib.SMTP(host, current_app.config["SMTP_PORT"], timeout=12) as server:
-                if current_app.config.get("SMTP_USE_TLS", True):
+            if use_ssl:
+                server_context = smtplib.SMTP_SSL(host, port, timeout=20)
+            else:
+                server_context = smtplib.SMTP(host, port, timeout=20)
+
+            with server_context as server:
+                if not use_ssl and current_app.config.get("SMTP_USE_TLS", True):
                     server.starttls()
-                username = current_app.config.get("SMTP_USERNAME", "")
-                password = current_app.config.get("SMTP_PASSWORD", "")
                 if username and password:
                     server.login(username, password)
                 server.send_message(message)
             return True
-        except OSError:
-            pass
+        except Exception as error:
+            delivery_error = f"{type(error).__name__}: {error}"
+            current_app.logger.warning("Email delivery failed; writing to outbox.", exc_info=True)
 
     outbox = current_app.config["EMAIL_OUTBOX_FILE"]
     outbox.parent.mkdir(parents=True, exist_ok=True)
@@ -41,12 +70,14 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         handle.write(f"Created: {utc_now()}\n")
         handle.write(f"To: {recipient}\n")
         handle.write(f"Subject: {subject}\n\n")
+        if delivery_error:
+            handle.write(f"Delivery error: {delivery_error}\n\n")
         handle.write(body.strip() + "\n")
     return False
 
 
-def send_account_created_email(to_email: str, full_name: str, password: str) -> None:
-    send_email(
+def send_account_created_email(to_email: str, full_name: str, password: str) -> bool:
+    return send_email(
         to_email,
         "Your Back to God AOG app account",
         "\n".join(
@@ -63,8 +94,8 @@ def send_account_created_email(to_email: str, full_name: str, password: str) -> 
     )
 
 
-def send_password_reset_link(to_email: str, full_name: str, reset_url: str) -> None:
-    send_email(
+def send_password_reset_link(to_email: str, full_name: str, reset_url: str) -> bool:
+    return send_email(
         to_email,
         "Reset your Back to God AOG password",
         "\n".join(
@@ -81,8 +112,8 @@ def send_password_reset_link(to_email: str, full_name: str, reset_url: str) -> N
     )
 
 
-def send_password_changed_email(to_email: str, full_name: str) -> None:
-    send_email(
+def send_password_changed_email(to_email: str, full_name: str) -> bool:
+    return send_email(
         to_email,
         "Your Back to God AOG password changed",
         "\n".join(

@@ -2945,6 +2945,10 @@ html[data-theme="dark"] .app-feature-panel::before {
   box-shadow: 0 14px 36px rgba(17, 24, 18, 0.1);
 }
 
+.user-search-panel {
+  grid-template-columns: 28px minmax(180px, 1fr) minmax(150px, 220px) auto;
+}
+
 .search-panel input {
   min-width: 0;
   border: 0;
@@ -2952,6 +2956,27 @@ html[data-theme="dark"] .app-feature-panel::before {
   color: var(--theme-ink);
   font-weight: 800;
   outline: none;
+}
+
+.search-panel select {
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--theme-line);
+  border-radius: 8px;
+  background: var(--theme-surface);
+  color: var(--theme-ink);
+  padding: 8px 10px;
+  font-weight: 850;
+  outline: none;
+}
+
+.search-panel input:focus,
+.search-panel select:focus {
+  box-shadow: 0 0 0 3px rgba(40, 100, 77, 0.14);
+}
+
+.user-search-panel .material-button {
+  white-space: nowrap;
 }
 
 .live-archive-hero {
@@ -4187,6 +4212,10 @@ html[data-theme="dark"] .attachment-viewer {
 
   .search-panel {
     grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .user-search-panel .search-select {
+    grid-column: 1 / -1;
   }
 
   .search-panel .material-button {

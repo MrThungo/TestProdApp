@@ -6,6 +6,10 @@
   {% include "partials/app_header.html" %}
   <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[960px] gap-6 pb-28 pt-6">
     <section>
+      <button class="material-button material-button-tonal w-fit" type="button" data-safe-back data-fallback-url="{{ url_for('dashboard.index') }}">
+        <span class="material-symbols-rounded text-[20px]">arrow_back</span>
+        <span>Back</span>
+      </button>
       <p class="mb-1 text-xs font-black uppercase text-btg-gold">Find</p>
       <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Search</h1>
       <form class="search-panel mt-5" method="get" action="{{ url_for('search.index') }}">

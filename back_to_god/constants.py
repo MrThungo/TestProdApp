@@ -12,7 +12,7 @@ ROLE_DESCRIPTIONS = {
     "super_admin": "Full control of church access and account recovery.",
     "admin": "Creates pastors and members, and supports church operations.",
     "pastor": "Pastoral care, follow-up, and ministry coordination.",
-    "usher": "Welcomes people, captures visitors, and supports live moments.",
+    "usher": "Welcomes people and supports live moments.",
     "videographer": "Runs live video moments and media for the church.",
     "treasurer": "Manages deposit slips and finance visibility windows.",
     "member": "Member access for church life and communication.",
@@ -29,7 +29,9 @@ ROLE_ICONS = {
 }
 
 CAN_GO_LIVE_ROLES = {"super_admin", "admin", "usher", "videographer"}
-CAN_CAPTURE_VISITOR_ROLES = {"super_admin", "admin", "usher"}
+CAN_CAPTURE_VISITOR_ROLES = {"super_admin", "admin", "pastor"}
+CAN_TRACK_MEMBERS_ROLES = {"super_admin", "admin", "pastor"}
+CAN_APPROVE_MEMBERSHIP_ROLES = {"super_admin", "admin"}
 CAN_POST_ANNOUNCEMENT_ROLES = {"super_admin", "admin"}
 CAN_UPLOAD_FINANCE_ROLES = {"super_admin", "treasurer"}
 CAN_APPROVE_FINANCE_ROLES = {"super_admin", "admin", "pastor"}

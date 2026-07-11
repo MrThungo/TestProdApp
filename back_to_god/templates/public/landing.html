@@ -19,6 +19,7 @@
         <a class="landing-nav-link" href="#vision">Vision</a>
         <a class="landing-nav-link" href="#mission">Mission</a>
         <a class="landing-nav-link" href="#services">Services</a>
+        <a class="landing-nav-link" href="{{ url_for('public.visitor_feedback') }}">Visitor card</a>
         <a class="landing-nav-link" href="#contact">Contact</a>
       </nav>
 
@@ -65,6 +66,10 @@
             <a class="material-button material-button-ghost" href="#services">
               <span class="material-symbols-rounded text-[20px]">event</span>
               <span>Service times</span>
+            </a>
+            <a class="material-button material-button-ghost" href="{{ url_for('public.visitor_feedback') }}">
+              <span class="material-symbols-rounded text-[20px]">rate_review</span>
+              <span>Visitor card</span>
             </a>
           </div>
         </div>
@@ -302,6 +307,10 @@
           <a class="material-button material-button-filled w-fit" href="{{ url_for('auth.login') }}">
             <span class="material-symbols-rounded text-[20px]">login</span>
             <span>Sign in</span>
+          </a>
+          <a class="material-button material-button-ghost w-fit" href="{{ url_for('public.visitor_feedback') }}">
+            <span class="material-symbols-rounded text-[20px]">rate_review</span>
+            <span>Visitor card</span>
           </a>
         </div>
       </div>

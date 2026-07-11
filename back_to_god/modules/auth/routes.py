@@ -55,11 +55,11 @@ def login():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         remember_me = request.form.get("remember_me") == "on"
-        user = get_user_by_email(email)
+        user = get_user_by_email(email, include_deleted=True)
 
         if user is None or not check_password_hash(user["password_hash"], password):
             flash("The email or password is not correct.", "error")
-        elif not user["is_active"]:
+        elif not user["is_active"] or user["deleted_at"]:
             flash("This account is inactive.", "error")
         else:
             session.clear()
@@ -128,8 +128,11 @@ def signup():
                     foreign_id_number,
                     nationality,
                 )
-                send_account_created_email(email, full_name, password)
-                flash("Member account created. The temporary password has been emailed.", "success")
+                email_sent = send_account_created_email(email, full_name, password)
+                if email_sent:
+                    flash("Member account created. The temporary password has been emailed.", "success")
+                else:
+                    flash("Member account created, but email could not be sent. Ask an admin to check the email outbox.", "warning")
                 log_event("signup", None, "user", None, email)
             except sqlite3.IntegrityError:
                 flash("An account with that email already exists.", "error")
@@ -149,8 +152,14 @@ def forgot_password():
         if user is not None and user["is_active"]:
             token = create_password_reset_token(user["id"])
             reset_url = url_for("auth.reset_password_token", token=token, _external=True)
-            send_password_reset_link(user["email"], user["full_name"], reset_url)
-            log_event("forgot_password_requested", user["id"], "user", user["id"], "Reset link sent")
+            email_sent = send_password_reset_link(user["email"], user["full_name"], reset_url)
+            log_event(
+                "forgot_password_requested",
+                user["id"],
+                "user",
+                user["id"],
+                "Reset link sent" if email_sent else "Reset link written to outbox",
+            )
         flash("If that account exists, a reset link has been sent. The link expires in 5 minutes.", "success")
         return redirect(url_for("auth.login"))
 
@@ -229,6 +238,10 @@ def quick_login(role: str):
 
     validate_csrf()
     user = get_or_create_quick_user(role)
+    if not user["is_active"] or user["deleted_at"]:
+        flash("This account is inactive.", "error")
+        return redirect(url_for("auth.login"))
+
     session.clear()
     session.permanent = True
     session["user_id"] = user["id"]

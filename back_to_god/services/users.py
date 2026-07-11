@@ -91,6 +91,8 @@ def create_user(
     foreign_id_number: str = "",
     nationality: str = "",
     must_change_password: bool = True,
+    phone: str = "",
+    home_area: str = "",
 ) -> str:
     password = generate_password()
     now = utc_now()
@@ -103,9 +105,9 @@ def create_user(
         INSERT INTO users (
             full_name, email, role, password_hash, must_change_password, created_by,
             identity_type, id_number, foreign_id_number, nationality, date_of_birth,
-            created_at, updated_at
+            phone, home_area, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             normalize_text(full_name, 120),
@@ -119,6 +121,8 @@ def create_user(
             clean_foreign_id,
             clean_nationality,
             date_of_birth,
+            normalize_text(phone, 40),
+            normalize_text(home_area, 120),
             now,
             now,
         ),
@@ -177,16 +181,17 @@ def get_or_create_quick_user(role: str) -> sqlite3.Row:
         raise ValueError("Unknown quick login role.")
 
     full_name, email = QUICK_LOGIN_USERS[role]
-    user = get_user_by_email(email)
+    user = get_user_by_email(email, include_deleted=True)
     if user is None:
         create_user(full_name, email, role, None, must_change_password=False)
         user = get_user_by_email(email)
+    elif user["deleted_at"] or not user["is_active"]:
+        return user
     else:
         get_db().execute(
             """
             UPDATE users
-            SET is_active = 1, deleted_at = NULL, deleted_by = NULL,
-                must_change_password = 0, updated_at = ?
+            SET must_change_password = 0, updated_at = ?
             WHERE id = ?
             """,
             (utc_now(), user["id"]),
@@ -685,6 +690,130 @@ def restore_user(user_id: int) -> None:
         (utc_now(), user_id),
     )
     get_db().commit()
+
+
+def permanently_delete_user(user_id: int) -> None:
+    db = get_db()
+    try:
+        db.execute("DELETE FROM password_reset_tokens WHERE user_id = ?", (user_id,))
+        db.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
+
+        db.execute(
+            """
+            DELETE FROM message_attachments
+            WHERE message_id IN (
+                SELECT id FROM messages WHERE sender_id = ? OR recipient_id = ?
+            )
+            """,
+            (user_id, user_id),
+        )
+        db.execute("DELETE FROM messages WHERE sender_id = ? OR recipient_id = ?", (user_id, user_id))
+
+        db.execute(
+            """
+            DELETE FROM timeline_media
+            WHERE post_id IN (SELECT id FROM timeline_posts WHERE author_id = ?)
+            """,
+            (user_id,),
+        )
+        db.execute(
+            """
+            DELETE FROM timeline_comments
+            WHERE user_id = ?
+               OR post_id IN (SELECT id FROM timeline_posts WHERE author_id = ?)
+            """,
+            (user_id, user_id),
+        )
+        db.execute(
+            """
+            DELETE FROM timeline_reactions
+            WHERE user_id = ?
+               OR post_id IN (SELECT id FROM timeline_posts WHERE author_id = ?)
+            """,
+            (user_id, user_id),
+        )
+        db.execute(
+            """
+            DELETE FROM timeline_post_viewers
+            WHERE user_id = ?
+               OR post_id IN (SELECT id FROM timeline_posts WHERE author_id = ?)
+            """,
+            (user_id, user_id),
+        )
+        db.execute("DELETE FROM timeline_posts WHERE author_id = ?", (user_id,))
+
+        db.execute(
+            """
+            DELETE FROM live_recordings
+            WHERE live_session_id IN (SELECT id FROM live_sessions WHERE started_by = ?)
+            """,
+            (user_id,),
+        )
+        db.execute(
+            """
+            DELETE FROM live_comments
+            WHERE user_id = ?
+               OR live_session_id IN (SELECT id FROM live_sessions WHERE started_by = ?)
+            """,
+            (user_id, user_id),
+        )
+        db.execute(
+            """
+            DELETE FROM live_reactions
+            WHERE user_id = ?
+               OR live_session_id IN (SELECT id FROM live_sessions WHERE started_by = ?)
+            """,
+            (user_id, user_id),
+        )
+        db.execute(
+            """
+            DELETE FROM webrtc_signals
+            WHERE live_session_id IN (SELECT id FROM live_sessions WHERE started_by = ?)
+            """,
+            (user_id,),
+        )
+        db.execute("DELETE FROM live_sessions WHERE started_by = ?", (user_id,))
+
+        db.execute("DELETE FROM announcements WHERE created_by = ?", (user_id,))
+        db.execute("DELETE FROM gallery_media WHERE uploaded_by = ?", (user_id,))
+        db.execute(
+            """
+            UPDATE finance_offerings
+            SET deposit_slip_id = NULL, updated_at = ?
+            WHERE deposit_slip_id IN (SELECT id FROM deposit_slips WHERE created_by = ?)
+            """,
+            (utc_now(), user_id),
+        )
+        db.execute("DELETE FROM deposit_slips WHERE created_by = ?", (user_id,))
+        db.execute("DELETE FROM finance_offerings WHERE captured_by = ?", (user_id,))
+
+        optional_user_refs = (
+            ("users", "created_by"),
+            ("users", "deleted_by"),
+            ("visitors", "captured_by"),
+            ("visitors", "follow_up_made_by"),
+            ("visitors", "membership_reviewed_by"),
+            ("visitors", "member_user_id"),
+            ("live_sessions", "recording_deleted_by"),
+            ("announcements", "deleted_by"),
+            ("gallery_media", "deleted_by"),
+            ("message_attachments", "deleted_by"),
+            ("messages", "deleted_by"),
+            ("live_recordings", "deleted_by"),
+            ("timeline_posts", "deleted_by"),
+            ("audit_logs", "user_id"),
+            ("deposit_slips", "approved_by"),
+            ("deposit_slips", "deleted_by"),
+            ("finance_offerings", "deleted_by"),
+        )
+        for table, column in optional_user_refs:
+            db.execute(f"UPDATE {table} SET {column} = NULL WHERE {column} = ?", (user_id,))
+
+        db.execute("DELETE FROM users WHERE id = ? AND deleted_at IS NOT NULL", (user_id,))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def deleted_user_count() -> int:

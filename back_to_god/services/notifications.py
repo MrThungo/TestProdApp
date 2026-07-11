@@ -55,6 +55,52 @@ def notify_live_started(live_session_id: int, title: str, started_by: int) -> No
     db.commit()
 
 
+def notify_admins_visitor_follow_up(visitor_id: int, visitor_name: str) -> None:
+    db = get_db()
+    admins = db.execute(
+        """
+        SELECT id
+        FROM users
+        WHERE role = 'admin'
+          AND is_active = 1
+          AND deleted_at IS NULL
+        """
+    ).fetchall()
+
+    for admin in admins:
+        create_notification(
+            admin["id"],
+            "Visitor follow-up",
+            f"{visitor_name} requested follow-up.",
+            f"/visitors/#visitor-{visitor_id}",
+            "visitor",
+        )
+    db.commit()
+
+
+def notify_admins_membership_request(visitor_id: int, visitor_name: str) -> None:
+    db = get_db()
+    admins = db.execute(
+        """
+        SELECT id
+        FROM users
+        WHERE role IN ('super_admin', 'admin')
+          AND is_active = 1
+          AND deleted_at IS NULL
+        """
+    ).fetchall()
+
+    for admin in admins:
+        create_notification(
+            admin["id"],
+            "Membership request",
+            f"{visitor_name} asked to become a member.",
+            f"/members/#membership-request-{visitor_id}",
+            "membership",
+        )
+    db.commit()
+
+
 def notification_count(user_id: int) -> int:
     row = get_db().execute(
         f"SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND {VISIBLE_NOTIFICATION_FILTER}",

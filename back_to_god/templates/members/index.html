@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Members | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1080px] gap-6 pb-28 pt-6">
+    {% include "partials/flash.html" %}
+
+    <section class="grid gap-3">
+      <button class="material-button material-button-tonal w-fit" type="button" data-safe-back data-fallback-url="{{ url_for('dashboard.index') }}">
+        <span class="material-symbols-rounded text-[20px]">arrow_back</span>
+        <span>Back</span>
+      </button>
+      <div>
+        <p class="mb-1 text-xs font-black uppercase text-btg-gold">Membership</p>
+        <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Church members</h1>
+        <p class="mt-3 max-w-2xl leading-7 text-btg-muted">Member requests, approvals, and the current church member directory.</p>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-2 gap-3 md:grid-cols-5">
+      {% for value, label, icon in [
+        (member_counts.all, "members", "groups"),
+        (member_counts.active, "active", "verified_user"),
+        (member_counts.inactive, "inactive", "person_off"),
+        (member_counts.pending_requests, "requests", "how_to_reg"),
+        (member_counts.approved_from_visitors, "from visitors", "diversity_3")
+      ] %}
+        <article class="material-card grid min-h-28 content-end p-4">
+          <span class="material-symbols-rounded mb-3 text-btg-green">{{ icon }}</span>
+          <strong class="text-[clamp(2rem,10vw,3.4rem)] leading-none">{{ value }}</strong>
+          <span class="text-sm text-btg-muted">{{ label }}</span>
+        </article>
+      {% endfor %}
+    </section>
+
+    <section class="grid gap-3">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <span>
+          <p class="text-xs font-black uppercase text-btg-gold">Requests</p>
+          <h2 class="text-2xl font-black">Pending membership</h2>
+        </span>
+        <a class="material-button material-button-tonal" href="{{ url_for('visitors.index') }}">
+          <span class="material-symbols-rounded text-[20px]">diversity_3</span>
+          <span>Visitors</span>
+        </a>
+      </div>
+      {% for visitor in pending_requests %}
+        <article class="material-card grid gap-4 p-4" id="membership-request-{{ visitor['id'] }}">
+          <div class="flex items-center justify-between gap-3">
+            <span class="grid min-w-0 gap-1">
+              <strong class="truncate">{{ visitor["full_name"] }}</strong>
+              <small class="truncate text-btg-muted">{{ visitor["visit_type"] }} - {{ visitor["visit_date"] | pretty_date }}</small>
+            </span>
+            <em class="material-chip not-italic">Pending</em>
+          </div>
+          <dl class="grid gap-2 md:grid-cols-3">
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Phone</dt><dd class="font-semibold">{{ visitor["phone"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Email</dt><dd class="font-semibold">{{ visitor["email"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Area</dt><dd class="font-semibold">{{ visitor["home_area"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Identity</dt><dd class="font-semibold">{{ "Foreign national" if visitor["identity_type"] == "foreign" else "South African ID" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">ID / passport</dt><dd class="font-semibold">{{ visitor["foreign_id_number"] if visitor["identity_type"] == "foreign" else (visitor["id_number"] or "Not added") }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Requested</dt><dd class="font-semibold">{{ visitor["membership_requested_at"] | pretty_date }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Captured by</dt><dd class="font-semibold">{{ visitor["captured_by_name"] or "Visitor self-submission" }}</dd></div>
+          </dl>
+          {% if visitor["service_feedback"] %}
+            <p class="leading-7 text-btg-muted"><strong>Service feedback:</strong> {{ visitor["service_feedback"] }}</p>
+          {% endif %}
+          {% if can_approve_membership %}
+            <form class="grid gap-2" method="post" action="{{ url_for('members.approve_request', visitor_id=visitor['id']) }}">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+              <textarea class="material-field" name="membership_notes" rows="2" placeholder="Approval notes"></textarea>
+              <button class="material-button material-button-filled" type="submit">
+                <span class="material-symbols-rounded text-[20px]">how_to_reg</span>
+                <span>Accept as member</span>
+              </button>
+            </form>
+          {% endif %}
+        </article>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          No pending membership requests.
+        </article>
+      {% endfor %}
+    </section>
+
+    <form class="search-panel user-search-panel" method="get" action="{{ url_for('members.index') }}" id="member-directory">
+      <span class="material-symbols-rounded">search</span>
+      <input name="q" value="{{ search_query }}" autocomplete="off" placeholder="Search members by name, email, phone, area, ID" />
+      <button class="material-button material-button-filled" type="submit">
+        <span class="material-symbols-rounded text-[20px]">filter_alt</span>
+        <span>Filter</span>
+      </button>
+    </form>
+
+    <section class="grid gap-3">
+      <p class="text-xs font-black uppercase text-btg-gold">Directory</p>
+      {% for member in members %}
+        <article class="material-card grid gap-4 p-4" id="member-{{ member['id'] }}">
+          <div class="flex items-center justify-between gap-3">
+            <span class="grid min-w-0 gap-1">
+              <strong class="truncate">{{ member["full_name"] }}</strong>
+              <small class="truncate text-btg-muted">{{ member["email"] }}</small>
+            </span>
+            <em class="material-chip not-italic">{{ "Active" if member["is_active"] else "Inactive" }}</em>
+          </div>
+          <dl class="grid gap-2 md:grid-cols-3">
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Phone</dt><dd class="font-semibold">{{ member["phone"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Area</dt><dd class="font-semibold">{{ member["home_area"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Identity</dt><dd class="font-semibold">{{ "Foreign national" if member["identity_type"] == "foreign" else "South African ID" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">ID / passport</dt><dd class="font-semibold">{{ member["foreign_id_number"] if member["identity_type"] == "foreign" else (member["id_number"] or "Not added") }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Nationality</dt><dd class="font-semibold">{{ member["nationality"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">DOB</dt><dd class="font-semibold">{{ member["date_of_birth"] or "Not added" }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Member since</dt><dd class="font-semibold">{{ (member["member_approved_at"] or member["created_at"]) | pretty_date }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Last login</dt><dd class="font-semibold">{{ member["last_login_at"] | pretty_date }}</dd></div>
+            <div><dt class="text-xs font-black uppercase text-btg-muted">Source</dt><dd class="font-semibold">{{ "Visitor request" if member["source_visitor_id"] else "Created account" }}</dd></div>
+          </dl>
+          {% if member["source_visitor_id"] %}
+            <p class="leading-7 text-btg-muted">
+              <strong>Accepted from visitor card:</strong>
+              {{ member["source_visit_date"] | pretty_date }}{% if member["approved_by_name"] %} by {{ member["approved_by_name"] }}{% endif %}.
+            </p>
+          {% endif %}
+          <div class="flex flex-wrap gap-2">
+            <a class="material-button material-button-tonal" href="{{ url_for('users.profile', user_id=member['id']) }}">
+              <span class="material-symbols-rounded text-[20px]">account_circle</span>
+              <span>Profile</span>
+            </a>
+          </div>
+        </article>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          No members found.
+        </article>
+      {% endfor %}
+      {% include "partials/pagination.html" %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

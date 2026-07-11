@@ -12,6 +12,7 @@ from back_to_god.core.permissions import (
 )
 from back_to_god.services.finance import finance_summary, list_visible_deposit_slips
 from back_to_god.services.live import count_active_sessions, list_active_sessions
+from back_to_god.services.members import count_members
 from back_to_god.services.announcements import list_recent_announcements
 from back_to_god.services.timeline import deleted_post_count
 from back_to_god.services.users import count_users, list_recent_users
@@ -27,12 +28,16 @@ def index():
     role = g.user["role"] if hasattr(g, "user") else "member"
     can_manage = bool(allowed_roles_for_current_user())
     show_user_counts = role in {"super_admin", "admin"}
-    show_visitor_counts = role in {"super_admin", "admin", "pastor", "usher"}
+    show_visitor_counts = role in {"super_admin", "admin", "pastor"}
+    show_member_tracking = role in {"super_admin", "admin", "pastor"}
     show_finance = can_manage_finance()
     users = count_users() if show_user_counts else {}
+    member_counts = count_members() if show_member_tracking else {"all": 0, "pending_requests": 0}
     visitors = count_visitors() if show_visitor_counts else {"all": 0, "open": 0}
     counts = {
         **users,
+        "members": users.get("members", member_counts["all"]),
+        "membership_requests": member_counts["pending_requests"],
         "visitors": visitors["all"],
         "visitor_followups": visitors["open"],
         "live_now": count_active_sessions(),
@@ -54,6 +59,7 @@ def index():
         can_post_announcements=role in CAN_POST_ANNOUNCEMENT_ROLES,
         show_user_counts=show_user_counts,
         show_visitor_counts=show_visitor_counts,
+        show_member_tracking=show_member_tracking,
         visitor_analytics=visitor_analytics() if show_visitor_counts else None,
         deleted_timeline_posts=deleted_post_count(g.user["id"], role),
     )
