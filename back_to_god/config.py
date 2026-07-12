@@ -54,6 +54,7 @@ class Config:
     SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
     SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "1") == "1"
     SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "") == "1"
+    SMTP_FALLBACK_PORTS = os.environ.get("SMTP_FALLBACK_PORTS", "587,465")
     ENABLE_QUICK_LOGIN = os.environ.get("ENABLE_QUICK_LOGIN", "1") == "1"
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)
     SESSION_COOKIE_HTTPONLY = True

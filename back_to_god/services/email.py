@@ -21,6 +21,34 @@ def _smtp_port() -> int:
         return 587
 
 
+def _smtp_fallback_ports() -> list[int]:
+    raw_ports = str(current_app.config.get("SMTP_FALLBACK_PORTS", "587,465"))
+    ports: list[int] = []
+    for value in raw_ports.split(","):
+        try:
+            port = int(value.strip())
+        except ValueError:
+            continue
+        if port > 0 and port not in ports:
+            ports.append(port)
+    return ports
+
+
+def _smtp_attempts() -> list[tuple[int, bool, bool]]:
+    configured_port = _smtp_port()
+    configured_ssl = bool(current_app.config.get("SMTP_USE_SSL")) or configured_port == 465
+    configured_tls = bool(current_app.config.get("SMTP_USE_TLS", True)) and not configured_ssl
+    attempts = [(configured_port, configured_ssl, configured_tls)]
+
+    for port in _smtp_fallback_ports():
+        use_ssl = port == 465
+        use_tls = not use_ssl
+        attempt = (port, use_ssl, use_tls)
+        if attempt not in attempts:
+            attempts.append(attempt)
+    return attempts
+
+
 def send_email(to_email: str, subject: str, body: str) -> bool:
     recipient = (to_email or "").strip()
     if not recipient:
@@ -42,26 +70,31 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
     message.set_content(body)
 
     host = _clean_config(current_app.config.get("SMTP_HOST", ""))
-    delivery_error = ""
+    delivery_errors: list[str] = []
     if host:
-        port = _smtp_port()
-        use_ssl = bool(current_app.config.get("SMTP_USE_SSL")) or port == 465
-        try:
-            if use_ssl:
-                server_context = smtplib.SMTP_SSL(host, port, timeout=20)
-            else:
-                server_context = smtplib.SMTP(host, port, timeout=20)
+        for port, use_ssl, use_tls in _smtp_attempts():
+            try:
+                if use_ssl:
+                    server_context = smtplib.SMTP_SSL(host, port, timeout=20)
+                else:
+                    server_context = smtplib.SMTP(host, port, timeout=20)
 
-            with server_context as server:
-                if not use_ssl and current_app.config.get("SMTP_USE_TLS", True):
-                    server.starttls()
-                if username and password:
-                    server.login(username, password)
-                server.send_message(message)
-            return True
-        except Exception as error:
-            delivery_error = f"{type(error).__name__}: {error}"
-            current_app.logger.warning("Email delivery failed; writing to outbox.", exc_info=True)
+                with server_context as server:
+                    if use_tls:
+                        server.starttls()
+                    if username and password:
+                        server.login(username, password)
+                    server.send_message(message)
+                return True
+            except Exception as error:
+                mode = "SSL" if use_ssl else ("STARTTLS" if use_tls else "plain")
+                delivery_errors.append(f"{host}:{port} {mode} - {type(error).__name__}: {error}")
+                current_app.logger.warning(
+                    "Email delivery failed on %s:%s; trying next SMTP option.",
+                    host,
+                    port,
+                    exc_info=True,
+                )
 
     outbox = current_app.config["EMAIL_OUTBOX_FILE"]
     outbox.parent.mkdir(parents=True, exist_ok=True)
@@ -70,8 +103,11 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         handle.write(f"Created: {utc_now()}\n")
         handle.write(f"To: {recipient}\n")
         handle.write(f"Subject: {subject}\n\n")
-        if delivery_error:
-            handle.write(f"Delivery error: {delivery_error}\n\n")
+        if delivery_errors:
+            handle.write("Delivery error:\n")
+            for error in delivery_errors:
+                handle.write(f"- {error}\n")
+            handle.write("\n")
         handle.write(body.strip() + "\n")
     return False
 
