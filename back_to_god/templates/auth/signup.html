@@ -26,6 +26,10 @@
 
     <section class="auth-form-panel">
       {% include "partials/flash.html" %}
+      <a class="material-button material-button-tonal w-fit" href="{{ url_for('auth.login') }}">
+        <span class="material-symbols-rounded text-[20px]">arrow_back</span>
+        <span>Back to sign in</span>
+      </a>
       <form class="auth-card" method="post" action="{{ url_for('auth.signup') }}">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
         <div>
@@ -84,7 +88,10 @@
           <span class="material-symbols-rounded text-[20px]">person_add</span>
           <span>Create account</span>
         </button>
-        <a class="material-button material-button-tonal w-full" href="{{ url_for('auth.login') }}">Back to sign in</a>
+        <a class="material-button material-button-tonal w-full" href="{{ url_for('auth.login') }}">
+          <span class="material-symbols-rounded text-[20px]">arrow_back</span>
+          <span>Back to sign in</span>
+        </a>
       </form>
     </section>
   </main>
