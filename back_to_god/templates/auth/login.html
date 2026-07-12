@@ -29,7 +29,7 @@
       {% include "partials/flash.html" %}
       <a class="material-button material-button-tonal w-fit" href="{{ url_for('public.landing') }}">
         <span class="material-symbols-rounded text-[20px]">arrow_back</span>
-        <span>Back</span>
+        <span>Home</span>
       </a>
       <form class="auth-card" method="post" action="{{ url_for('auth.login') }}">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
