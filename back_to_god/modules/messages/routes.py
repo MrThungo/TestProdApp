@@ -194,12 +194,20 @@ def attachment(attachment_id: int):
     item = get_attachment_for_user(attachment_id, g.user["id"])
     if item is None:
         abort(404)
+    etag = f"attachment-{item['id']}-{item['size_bytes']}"
     headers = {
         "Cache-Control": "private, max-age=86400",
         "Content-Length": str(item["size_bytes"]),
         "Content-Disposition": f"inline; filename=\"{item['original_name'] or 'message-media'}\"",
     }
-    return Response(item["data"], mimetype=item["mime_type"], headers=headers)
+    if request.if_none_match.contains(etag):
+        response = Response(status=304, headers={"Cache-Control": headers["Cache-Control"]})
+        response.set_etag(etag)
+        return response
+
+    response = Response(item["data"], mimetype=item["mime_type"], headers=headers)
+    response.set_etag(etag)
+    return response
 
 
 @bp.get("/attachment/<int:attachment_id>/view")

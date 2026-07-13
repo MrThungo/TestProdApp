@@ -3,6 +3,8 @@
   data-live-fragment
   data-live-fragment-url="{{ url_for('gallery.poll') }}"
   data-live-latest="{{ latest_update|default('') }}"
+  data-gallery-browser
+  data-gallery-view="mosaic"
 >
   <section class="gallery-category-strip" aria-label="Gallery categories">
     <a class="{% if not category_id %}active{% endif %}" href="{{ url_for('gallery.index', q=query, kind=media_kind) }}">All</a>
@@ -14,7 +16,7 @@
   </section>
 
   {% if not category_id %}
-    <section class="gallery-category-groups">
+    <section class="gallery-category-groups" aria-label="Gallery collections">
       {% for group in gallery_groups %}
         <a class="gallery-group-card" href="{{ url_for('gallery.index', q=query, kind=media_kind, category=group['id']) }}">
           <span class="gallery-group-preview">
@@ -22,9 +24,6 @@
               <img src="{{ url_for('gallery.media', media_id=group['preview_media_id']) }}" alt="" loading="lazy" />
             {% else %}
               <video muted playsinline preload="metadata" src="{{ url_for('gallery.media', media_id=group['preview_media_id']) }}"></video>
-              <span class="gallery-play">
-                <span class="material-symbols-rounded">play_arrow</span>
-              </span>
             {% endif %}
           </span>
           <span class="gallery-group-body">
@@ -34,43 +33,86 @@
           </span>
         </a>
       {% else %}
-        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
-          No gallery categories with media found.
+        <article class="gallery-empty-panel">
+          <span class="material-symbols-rounded">collections</span>
+          <strong>No collections yet.</strong>
+          <small>Upload media to start building the church gallery.</small>
         </article>
       {% endfor %}
     </section>
-  {% else %}
-    <section class="gallery-grid">
-      {% for media in media_items %}
-        {% set back_url = gallery_return_base ~ '#gallery-media-' ~ media['id'] %}
-        <a
-          class="gallery-card"
-          id="gallery-media-{{ media['id'] }}"
-          href="{{ url_for('gallery.media_view', media_id=media['id'], back=back_url) }}"
-        >
-          <span class="gallery-frame">
-            {% if media["media_kind"] == "image" %}
-              <img src="{{ url_for('gallery.media', media_id=media['id']) }}" alt="" loading="lazy" />
-            {% else %}
-              <video muted playsinline preload="metadata" src="{{ url_for('gallery.media', media_id=media['id']) }}"></video>
-              <span class="gallery-play">
-                <span class="material-symbols-rounded">play_arrow</span>
-              </span>
-            {% endif %}
-            <em>{{ media["category_name"] }}</em>
-          </span>
-          <span class="gallery-caption">
-            <strong>{{ media["title"] }}</strong>
-            <small>{{ (media["event_at"] or media["created_at"]) | chat_timestamp }} by {{ media["uploaded_by_name"] }}</small>
-          </span>
-        </a>
-      {% else %}
-        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
-          No gallery media found.
-        </article>
-      {% endfor %}
-    </section>
-
-    {% include "partials/pagination.html" %}
   {% endif %}
+
+  <section class="gallery-browser-toolbar" aria-label="Gallery browser controls">
+    <div>
+      <p>{{ pagination["start"] }}-{{ pagination["end"] }} of {{ pagination["total"] }}</p>
+      <strong>
+        {% if category_id %}
+          {% for category in categories %}{% if category_id == category['id'] %}{{ category["name"] }}{% endif %}{% endfor %}
+        {% elif query or media_kind %}
+          Filtered gallery
+        {% else %}
+          All gallery media
+        {% endif %}
+      </strong>
+    </div>
+    <div class="gallery-view-switcher" aria-label="View mode">
+      <button type="button" class="is-active" data-gallery-view-button="mosaic" aria-label="Mosaic view" title="Mosaic view">
+        <span class="material-symbols-rounded">dashboard</span>
+      </button>
+      <button type="button" data-gallery-view-button="cinema" aria-label="Cinema view" title="Cinema view">
+        <span class="material-symbols-rounded">theaters</span>
+      </button>
+      <button type="button" data-gallery-view-button="compact" aria-label="Compact view" title="Compact view">
+        <span class="material-symbols-rounded">view_list</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="gallery-grid" data-gallery-grid aria-label="Gallery media">
+    {% for media in media_items %}
+      {% set back_url = gallery_return_base ~ '#gallery-media-' ~ media['id'] %}
+      {% set media_url = url_for('gallery.media', media_id=media['id']) %}
+      <a
+        class="gallery-card"
+        id="gallery-media-{{ media['id'] }}"
+        href="{{ url_for('gallery.media_view', media_id=media['id'], back=back_url) }}"
+        data-gallery-lightbox
+        data-media-id="{{ media['id'] }}"
+        data-media-url="{{ media_url }}"
+        data-media-kind="{{ media['media_kind'] }}"
+        data-media-title="{{ media['title']|e }}"
+        data-media-meta="{{ media['category_name']|e }} - {{ (media['event_at'] or media['created_at']) | chat_timestamp }}"
+        data-media-description="{{ media['description']|default('', true)|e }}"
+        data-media-view-url="{{ url_for('gallery.media_view', media_id=media['id'], back=back_url) }}"
+      >
+        <span class="gallery-frame">
+          {% if media["media_kind"] == "image" %}
+            <img src="{{ media_url }}" alt="{{ media['title'] }}" loading="lazy" />
+          {% else %}
+            <video muted playsinline preload="metadata" src="{{ media_url }}"></video>
+          {% endif %}
+          <em>{{ media["category_name"] }}</em>
+          <span class="gallery-kind-chip">
+            <span class="material-symbols-rounded">{{ "movie" if media["media_kind"] == "video" else "image" }}</span>
+            {{ "Video" if media["media_kind"] == "video" else "Photo" }}
+          </span>
+        </span>
+        <span class="gallery-caption">
+          <strong>{{ media["title"] }}</strong>
+          <small>{{ (media["event_at"] or media["created_at"]) | chat_timestamp }} by {{ media["uploaded_by_name"] }}</small>
+          {% if media["description"] %}
+            <span>{{ media["description"] }}</span>
+          {% endif %}
+        </span>
+      </a>
+    {% else %}
+      <article class="gallery-empty-panel">
+        <span class="material-symbols-rounded">image_not_supported</span>
+        <strong>No gallery media found.</strong>
+        <small>Try a different filter or upload new media.</small>
+      </article>
+    {% endfor %}
+  </section>
+
+  {% include "partials/pagination.html" %}
 </section>

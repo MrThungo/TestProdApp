@@ -15,42 +15,31 @@ from back_to_god.services.users import (
 
 def count_members() -> dict[str, int]:
     db = get_db()
+    member_counts = db.execute(
+        """
+        SELECT
+            COUNT(*) AS all_members,
+            COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) AS active,
+            COALESCE(SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END), 0) AS inactive
+        FROM users
+        WHERE role = 'member' AND deleted_at IS NULL
+        """
+    ).fetchone()
+    request_counts = db.execute(
+        """
+        SELECT
+            COALESCE(SUM(CASE WHEN membership_status = 'pending' THEN 1 ELSE 0 END), 0) AS pending_requests,
+            COALESCE(SUM(CASE WHEN membership_status = 'approved' THEN 1 ELSE 0 END), 0) AS approved_from_visitors
+        FROM visitors
+        WHERE membership_requested = 1
+        """
+    ).fetchone()
     return {
-        "all": db.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM users
-            WHERE role = 'member' AND deleted_at IS NULL
-            """
-        ).fetchone()["count"],
-        "active": db.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM users
-            WHERE role = 'member' AND is_active = 1 AND deleted_at IS NULL
-            """
-        ).fetchone()["count"],
-        "inactive": db.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM users
-            WHERE role = 'member' AND is_active = 0 AND deleted_at IS NULL
-            """
-        ).fetchone()["count"],
-        "pending_requests": db.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM visitors
-            WHERE membership_requested = 1 AND membership_status = 'pending'
-            """
-        ).fetchone()["count"],
-        "approved_from_visitors": db.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM visitors
-            WHERE membership_requested = 1 AND membership_status = 'approved'
-            """
-        ).fetchone()["count"],
+        "all": int(member_counts["all_members"]),
+        "active": int(member_counts["active"]),
+        "inactive": int(member_counts["inactive"]),
+        "pending_requests": int(request_counts["pending_requests"]),
+        "approved_from_visitors": int(request_counts["approved_from_visitors"]),
     }
 
 

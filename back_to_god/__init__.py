@@ -17,6 +17,26 @@ from .services.notifications import unread_count
 from .services.users import touch_presence
 
 
+PRESENCE_WRITE_INTERVAL_SECONDS = 180
+REMINDER_DISPATCH_INTERVAL_SECONDS = 300
+HIGH_FREQUENCY_ENDPOINTS = {
+    "announcements.poll",
+    "gallery.media",
+    "gallery.poll",
+    "live.engagement",
+    "live.recording_upload",
+    "live.signal",
+    "live.signals",
+    "live.status",
+    "messages.attachment",
+    "messages.poll",
+    "messages.presence",
+    "notifications.poll",
+    "profile.photo",
+    "timeline.poll",
+}
+
+
 def create_app(config: type[Config] = Config) -> Flask:
     app = Flask(__name__, instance_path=str(config.INSTANCE_DIR), template_folder="templates")
     app.config.from_object(config)
@@ -117,6 +137,10 @@ def register_request_hooks(app: Flask) -> None:
         g.unread_notifications = 0
         g.unread_messages = 0
         g.show_finance_tab = False
+        if request.endpoint == "static":
+            g.user = None
+            return
+
         user_id = session.get("user_id")
         if user_id is None:
             g.user = None
@@ -144,11 +168,19 @@ def register_request_hooks(app: Flask) -> None:
             return
 
         now_seconds = int(time.time())
-        if now_seconds - int(session.get("last_seen_write", 0)) > 45:
+        high_frequency_request = request.endpoint in HIGH_FREQUENCY_ENDPOINTS
+
+        if (
+            not high_frequency_request
+            and now_seconds - int(session.get("last_seen_write", 0)) > PRESENCE_WRITE_INTERVAL_SECONDS
+        ):
             touch_presence(g.user["id"])
             session["last_seen_write"] = now_seconds
 
-        if now_seconds - int(session.get("last_announcement_reminder_check", 0)) > 60:
+        if (
+            not high_frequency_request
+            and now_seconds - int(session.get("last_announcement_reminder_check", 0)) > REMINDER_DISPATCH_INTERVAL_SECONDS
+        ):
             from .services.announcements import dispatch_due_announcement_reminders
 
             dispatch_due_announcement_reminders()
@@ -161,6 +193,10 @@ def register_request_hooks(app: Flask) -> None:
         }
         if g.user["must_change_password"] and request.endpoint not in allowed_endpoints:
             return redirect(url_for("auth.change_password"))
+
+        if high_frequency_request:
+            g.show_finance_tab = g.user["role"] in CAN_MANAGE_FINANCE_ROLES
+            return
 
         g.unread_notifications = unread_count(g.user["id"])
         g.unread_messages = unread_message_count(g.user["id"])
@@ -208,6 +244,7 @@ def register_request_hooks(app: Flask) -> None:
             "messages.presence",
             "notifications.poll",
             "announcements.poll",
+            "gallery.media",
             "gallery.poll",
             "timeline.poll",
             "live.engagement",
@@ -215,6 +252,8 @@ def register_request_hooks(app: Flask) -> None:
             "live.recording_upload",
             "live.signals",
             "live.signal",
+            "messages.attachment",
+            "profile.photo",
         }
         if request.endpoint not in skipped and not request.path.startswith("/static/"):
             log_event(
@@ -232,6 +271,7 @@ def register_blueprints(app: Flask) -> None:
     from .modules.api.routes import bp as api_bp
     from .modules.audit.routes import bp as audit_bp
     from .modules.auth.routes import bp as auth_bp
+    from .modules.committees.routes import bp as committees_bp
     from .modules.dashboard.routes import bp as dashboard_bp
     from .modules.finance.routes import bp as finance_bp
     from .modules.gallery.routes import bp as gallery_bp
@@ -251,6 +291,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(announcements_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(audit_bp)
+    app.register_blueprint(committees_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(finance_bp)
     app.register_blueprint(gallery_bp)

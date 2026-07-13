@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Committees | Back to God AOG{% endblock %}
+
+{% block page %}
+  {% include "partials/app_header.html" %}
+  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1120px] gap-6 pb-28 pt-6">
+    {% include "partials/flash.html" %}
+
+    <section class="grid gap-3">
+      <button class="material-button material-button-tonal w-fit" type="button" data-safe-back data-fallback-url="{{ url_for('dashboard.index') }}">
+        <span class="material-symbols-rounded text-[20px]">arrow_back</span>
+        <span>Back</span>
+      </button>
+      <div>
+        <p class="mb-1 text-xs font-black uppercase text-btg-gold">Leadership and service</p>
+        <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Committees</h1>
+        <p class="mt-3 max-w-2xl leading-7 text-btg-muted">See the teams serving the church and the people assigned to each committee.</p>
+      </div>
+    </section>
+
+    {% if can_manage_committees %}
+      <section class="material-card grid gap-4 p-4">
+        <div>
+          <p class="text-xs font-black uppercase text-btg-gold">Admin setup</p>
+          <h2 class="text-2xl font-black">Create committee</h2>
+        </div>
+        <form class="grid gap-4" method="post" action="{{ url_for('committees.create') }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Committee name</span>
+              <input class="material-field" name="name" maxlength="120" placeholder="Finance, Hospitality, Youth..." required />
+            </label>
+            <label class="grid gap-2">
+              <span class="text-sm font-bold text-btg-muted">Description</span>
+              <input class="material-field" name="description" maxlength="700" placeholder="What this committee cares for" />
+            </label>
+          </div>
+          <button class="material-button material-button-filled w-full" type="submit">
+            <span class="material-symbols-rounded text-[20px]">groups</span>
+            <span>Create committee</span>
+          </button>
+        </form>
+      </section>
+    {% endif %}
+
+    <section class="grid gap-4">
+      {% for group in committees %}
+        {% set committee = group["committee"] %}
+        <article class="committee-panel" id="committee-{{ committee['id'] }}">
+          <header class="committee-panel-header">
+            <span>
+              <p class="text-xs font-black uppercase text-btg-gold">{{ group["members"]|length }} member{{ "" if group["members"]|length == 1 else "s" }}</p>
+              <h2>{{ committee["name"] }}</h2>
+              {% if committee["description"] %}
+                <small>{{ committee["description"] }}</small>
+              {% endif %}
+            </span>
+            {% if can_manage_committees %}
+              <form method="post" action="{{ url_for('committees.delete', committee_id=committee['id']) }}" data-confirm-action="Remove this committee?">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                <button class="icon-action danger-action" type="submit" aria-label="Remove committee">
+                  <span class="material-symbols-rounded">delete</span>
+                </button>
+              </form>
+            {% endif %}
+          </header>
+
+          {% if can_manage_committees %}
+            <form class="committee-add-form" method="post" action="{{ url_for('committees.add_member', committee_id=committee['id']) }}">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+              <select class="material-field" name="user_id" aria-label="Choose user">
+                <option value="">Choose person</option>
+                {% for user in user_options %}
+                  <option value="{{ user['id'] }}">{{ user["full_name"] }} - {{ role_labels[user["role"]] }}</option>
+                {% endfor %}
+              </select>
+              <input class="material-field" name="title" maxlength="120" placeholder="Chairperson, secretary, member..." />
+              <input class="material-field" name="sort_order" type="number" min="0" step="1" placeholder="Order" />
+              <button class="material-button material-button-tonal" type="submit">
+                <span class="material-symbols-rounded text-[20px]">person_add</span>
+                <span>Add</span>
+              </button>
+            </form>
+          {% endif %}
+
+          <section class="committee-member-grid">
+            {% for member in group["members"] %}
+              <article class="committee-member-card">
+                <span class="committee-photo-shell">
+                  {% if member["profile_photo"] %}
+                    <img src="{{ url_for('profile.photo', filename=member['profile_photo']) }}" alt="" />
+                  {% else %}
+                    <em>{{ member["full_name"][:1] }}</em>
+                  {% endif %}
+                </span>
+                <span class="committee-member-copy">
+                  <strong>{{ member["full_name"] }}</strong>
+                  <small>{{ member["committee_title"] or role_labels[member["role"]] }}</small>
+                  {% if member["home_area"] %}
+                    <span>{{ member["home_area"] }}</span>
+                  {% endif %}
+                </span>
+                {% if can_manage_committees %}
+                  <form method="post" action="{{ url_for('committees.remove_member', membership_id=member['membership_id']) }}" data-confirm-action="Remove this person from the committee?">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+                    <button class="icon-action" type="submit" aria-label="Remove from committee">
+                      <span class="material-symbols-rounded">close</span>
+                    </button>
+                  </form>
+                {% endif %}
+              </article>
+            {% else %}
+              <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+                No one has been added to this committee yet.
+              </article>
+            {% endfor %}
+          </section>
+        </article>
+      {% else %}
+        <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+          No committees have been added yet.
+        </article>
+      {% endfor %}
+    </section>
+  </main>
+  {% include "partials/bottom_nav.html" %}
+{% endblock %}

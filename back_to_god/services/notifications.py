@@ -35,69 +35,63 @@ def create_notification(
 
 def notify_live_started(live_session_id: int, title: str, started_by: int) -> None:
     db = get_db()
-    users = db.execute(
+    db.execute(
         """
-        SELECT id
+        INSERT INTO notifications (user_id, title, message, target_url, category, created_at)
+        SELECT id, ?, ?, ?, 'live', ?
         FROM users
-        WHERE is_active = 1 AND id != ?
+        WHERE is_active = 1
+          AND deleted_at IS NULL
+          AND id != ?
         """,
-        (started_by,),
-    ).fetchall()
-
-    for user in users:
-        create_notification(
-            user["id"],
+        (
             "Live now",
-            f"{title} has started.",
+            normalize_text(f"{title} has started.", 220),
             f"/live/{live_session_id}",
-            "live",
-        )
+            utc_now(),
+            started_by,
+        ),
+    )
     db.commit()
 
 
 def notify_admins_visitor_follow_up(visitor_id: int, visitor_name: str) -> None:
     db = get_db()
-    admins = db.execute(
+    db.execute(
         """
-        SELECT id
+        INSERT INTO notifications (user_id, title, message, target_url, category, created_at)
+        SELECT id, 'Visitor follow-up', ?, ?, 'visitor', ?
         FROM users
         WHERE role = 'admin'
           AND is_active = 1
           AND deleted_at IS NULL
-        """
-    ).fetchall()
-
-    for admin in admins:
-        create_notification(
-            admin["id"],
-            "Visitor follow-up",
-            f"{visitor_name} requested follow-up.",
+        """,
+        (
+            normalize_text(f"{visitor_name} requested follow-up.", 220),
             f"/visitors/#visitor-{visitor_id}",
-            "visitor",
-        )
+            utc_now(),
+        ),
+    )
     db.commit()
 
 
 def notify_admins_membership_request(visitor_id: int, visitor_name: str) -> None:
     db = get_db()
-    admins = db.execute(
+    db.execute(
         """
-        SELECT id
+        INSERT INTO notifications (user_id, title, message, target_url, category, created_at)
+        SELECT id, 'Membership request', ?, ?, 'membership', ?
         FROM users
         WHERE role IN ('super_admin', 'admin')
           AND is_active = 1
           AND deleted_at IS NULL
-        """
-    ).fetchall()
-
-    for admin in admins:
-        create_notification(
-            admin["id"],
-            "Membership request",
-            f"{visitor_name} asked to become a member.",
+        """,
+        (
+            normalize_text(f"{visitor_name} asked to become a member.", 220),
             f"/members/#membership-request-{visitor_id}",
-            "membership",
-        )
+            utc_now(),
+        ),
+    )
     db.commit()
 
 

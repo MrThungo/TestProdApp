@@ -190,6 +190,47 @@ if SQLALCHEMY_AVAILABLE:
         deleted_by = Column(Integer, ForeignKey("users.id"))
 
 
+    class GallerySlideshowItem(Base):
+        __tablename__ = "gallery_slideshow_items"
+
+        id = Column(Integer, primary_key=True)
+        media_id = Column(Integer, ForeignKey("gallery_media.id"), nullable=False, unique=True)
+        caption = Column(Text)
+        sort_order = Column(Integer, nullable=False, default=0)
+        is_active = Column(Integer, nullable=False, default=1)
+        added_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+        created_at = Column(String(40), nullable=False)
+        updated_at = Column(String(40), nullable=False)
+
+
+    class Committee(Base):
+        __tablename__ = "committees"
+
+        id = Column(Integer, primary_key=True)
+        name = Column(String(120), nullable=False)
+        description = Column(Text)
+        created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+        created_at = Column(String(40), nullable=False)
+        updated_at = Column(String(40), nullable=False)
+        deleted_at = Column(String(40))
+        deleted_by = Column(Integer, ForeignKey("users.id"))
+
+
+    class CommitteeMember(Base):
+        __tablename__ = "committee_members"
+        __table_args__ = (
+            UniqueConstraint("committee_id", "user_id", name="uq_committee_members_committee_user"),
+        )
+
+        id = Column(Integer, primary_key=True)
+        committee_id = Column(Integer, ForeignKey("committees.id"), nullable=False)
+        user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+        title = Column(String(120))
+        sort_order = Column(Integer, nullable=False, default=0)
+        created_at = Column(String(40), nullable=False)
+        updated_at = Column(String(40), nullable=False)
+
+
     class WebRTCSignal(Base):
         __tablename__ = "webrtc_signals"
         __table_args__ = (
@@ -404,7 +445,8 @@ if SQLALCHEMY_AVAILABLE:
         deleted_by = Column(Integer, ForeignKey("users.id"))
 else:
     User = Visitor = LiveSession = Notification = Announcement = GalleryCategory = None
-    GalleryMedia = WebRTCSignal = Message = None
+    GalleryMedia = GallerySlideshowItem = Committee = CommitteeMember = None
+    WebRTCSignal = Message = None
     MessageAttachment = LiveRecording = LiveComment = LiveReaction = None
     TimelinePost = TimelinePostViewer = TimelineMedia = TimelineComment = None
     TimelineReaction = AuditLog = DepositSlip = PasswordResetToken = FinanceOffering = None

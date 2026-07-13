@@ -128,40 +128,30 @@ def create_visitor(form, captured_by: int | None) -> int:
 
 
 def count_visitors() -> dict[str, int]:
-    db = get_db()
+    row = get_db().execute(
+        """
+        SELECT
+            COUNT(*) AS all_visitors,
+            COALESCE(SUM(CASE WHEN follow_up_status = 'new' THEN 1 ELSE 0 END), 0) AS new,
+            COALESCE(SUM(CASE WHEN follow_up_requested = 1 OR follow_up_status = 'follow_up' THEN 1 ELSE 0 END), 0) AS follow_up,
+            COALESCE(SUM(CASE WHEN follow_up_status = 'connected' THEN 1 ELSE 0 END), 0) AS connected,
+            COALESCE(SUM(CASE WHEN follow_up_made_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS follow_up_done,
+            COALESCE(SUM(CASE WHEN membership_requested = 1 AND membership_status = 'pending' THEN 1 ELSE 0 END), 0) AS membership_pending,
+            COALESCE(SUM(CASE
+                WHEN (follow_up_requested = 1 OR follow_up_status = 'follow_up')
+                 AND follow_up_made_at IS NULL
+                THEN 1 ELSE 0 END), 0) AS open
+        FROM visitors
+        """
+    ).fetchone()
     return {
-        "all": db.execute("SELECT COUNT(*) AS count FROM visitors").fetchone()["count"],
-        "new": db.execute(
-            "SELECT COUNT(*) AS count FROM visitors WHERE follow_up_status = 'new'"
-        ).fetchone()["count"],
-        "follow_up": db.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM visitors
-            WHERE follow_up_requested = 1 OR follow_up_status = 'follow_up'
-            """
-        ).fetchone()["count"],
-        "connected": db.execute(
-            "SELECT COUNT(*) AS count FROM visitors WHERE follow_up_status = 'connected'"
-        ).fetchone()["count"],
-        "follow_up_done": db.execute(
-            "SELECT COUNT(*) AS count FROM visitors WHERE follow_up_made_at IS NOT NULL"
-        ).fetchone()["count"],
-        "membership_pending": db.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM visitors
-            WHERE membership_requested = 1 AND membership_status = 'pending'
-            """
-        ).fetchone()["count"],
-        "open": db.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM visitors
-            WHERE (follow_up_requested = 1 OR follow_up_status = 'follow_up')
-              AND follow_up_made_at IS NULL
-            """
-        ).fetchone()["count"],
+        "all": int(row["all_visitors"]),
+        "new": int(row["new"]),
+        "follow_up": int(row["follow_up"]),
+        "connected": int(row["connected"]),
+        "follow_up_done": int(row["follow_up_done"]),
+        "membership_pending": int(row["membership_pending"]),
+        "open": int(row["open"]),
     }
 
 

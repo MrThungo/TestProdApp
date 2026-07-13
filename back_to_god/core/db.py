@@ -14,6 +14,9 @@ def configure_connection(db: sqlite3.Connection, *, enable_wal: bool = False) ->
     db.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
     db.execute("PRAGMA foreign_keys = ON")
     db.execute("PRAGMA synchronous = NORMAL")
+    db.execute("PRAGMA temp_store = MEMORY")
+    db.execute("PRAGMA cache_size = -32768")
+    db.execute("PRAGMA mmap_size = 268435456")
     if enable_wal:
         db.execute("PRAGMA journal_mode = WAL")
 
@@ -198,6 +201,45 @@ def init_db() -> None:
             FOREIGN KEY (category_id) REFERENCES gallery_categories (id),
             FOREIGN KEY (uploaded_by) REFERENCES users (id),
             FOREIGN KEY (deleted_by) REFERENCES users (id)
+        );
+
+        CREATE TABLE IF NOT EXISTS gallery_slideshow_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER NOT NULL UNIQUE,
+            caption TEXT,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            added_by INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (media_id) REFERENCES gallery_media (id),
+            FOREIGN KEY (added_by) REFERENCES users (id)
+        );
+
+        CREATE TABLE IF NOT EXISTS committees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            created_by INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted_at TEXT,
+            deleted_by INTEGER,
+            FOREIGN KEY (created_by) REFERENCES users (id),
+            FOREIGN KEY (deleted_by) REFERENCES users (id)
+        );
+
+        CREATE TABLE IF NOT EXISTS committee_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            committee_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            title TEXT,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (committee_id, user_id),
+            FOREIGN KEY (committee_id) REFERENCES committees (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
         );
 
         CREATE TABLE IF NOT EXISTS webrtc_signals (
@@ -397,18 +439,38 @@ def init_db() -> None:
 
         CREATE INDEX IF NOT EXISTS idx_live_sessions_status
             ON live_sessions (status, started_at);
+        CREATE INDEX IF NOT EXISTS idx_users_active_role
+            ON users (deleted_at, is_active, role, full_name);
+        CREATE INDEX IF NOT EXISTS idx_users_last_seen
+            ON users (deleted_at, last_seen_at);
         CREATE INDEX IF NOT EXISTS idx_notifications_user_read
             ON notifications (user_id, is_read, created_at);
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_category_created
+            ON notifications (user_id, category, created_at);
         CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash
             ON password_reset_tokens (token_hash, expires_at, used_at);
         CREATE INDEX IF NOT EXISTS idx_announcements_active
             ON announcements (deleted_at, is_pinned, created_at);
         CREATE INDEX IF NOT EXISTS idx_gallery_media_category
             ON gallery_media (deleted_at, category_id, event_at, created_at);
+        CREATE INDEX IF NOT EXISTS idx_gallery_media_kind_created
+            ON gallery_media (deleted_at, media_kind, created_at);
+        CREATE INDEX IF NOT EXISTS idx_gallery_media_updated
+            ON gallery_media (deleted_at, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_gallery_slideshow_order
+            ON gallery_slideshow_items (is_active, sort_order, id);
+        CREATE INDEX IF NOT EXISTS idx_committees_active
+            ON committees (deleted_at, name);
+        CREATE INDEX IF NOT EXISTS idx_committee_members_committee
+            ON committee_members (committee_id, sort_order, id);
         CREATE INDEX IF NOT EXISTS idx_webrtc_signals_session
             ON webrtc_signals (live_session_id, viewer_token, id);
         CREATE INDEX IF NOT EXISTS idx_messages_pair
             ON messages (sender_id, recipient_id, id);
+        CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread
+            ON messages (recipient_id, is_read, id);
+        CREATE INDEX IF NOT EXISTS idx_messages_thread_updated
+            ON messages (recipient_id, sender_id, updated_at, id);
         CREATE INDEX IF NOT EXISTS idx_message_attachments_message
             ON message_attachments (message_id);
         CREATE INDEX IF NOT EXISTS idx_live_recordings_session
@@ -419,6 +481,8 @@ def init_db() -> None:
             ON live_reactions (live_session_id, reaction_type);
         CREATE INDEX IF NOT EXISTS idx_timeline_posts_created
             ON timeline_posts (deleted_at, created_at);
+        CREATE INDEX IF NOT EXISTS idx_timeline_posts_visibility_created
+            ON timeline_posts (deleted_at, visibility, created_at);
         CREATE INDEX IF NOT EXISTS idx_timeline_posts_event
             ON timeline_posts (event_date, created_at);
         CREATE INDEX IF NOT EXISTS idx_timeline_post_viewers_user
@@ -433,10 +497,16 @@ def init_db() -> None:
             ON audit_logs (created_at, user_id);
         CREATE INDEX IF NOT EXISTS idx_deposit_slips_visibility
             ON deposit_slips (is_visible, visible_until, deposit_date);
+        CREATE INDEX IF NOT EXISTS idx_deposit_slips_approval_visible
+            ON deposit_slips (deleted_at, approval_status, is_visible, visible_until);
         CREATE INDEX IF NOT EXISTS idx_finance_offerings_date
             ON finance_offerings (deleted_at, offering_date, deposit_slip_id);
         CREATE INDEX IF NOT EXISTS idx_visitors_membership_status
             ON visitors (membership_status, membership_requested_at);
+        CREATE INDEX IF NOT EXISTS idx_visitors_follow_up
+            ON visitors (follow_up_status, follow_up_requested, visit_date);
+        CREATE INDEX IF NOT EXISTS idx_visitors_visit_date
+            ON visitors (visit_date);
         """
     )
     db.commit()
@@ -696,6 +766,72 @@ def migrate_db() -> None:
             ON gallery_media (deleted_at, category_id, event_at, created_at)
         """
     )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS gallery_slideshow_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER NOT NULL UNIQUE,
+            caption TEXT,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            added_by INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (media_id) REFERENCES gallery_media (id),
+            FOREIGN KEY (added_by) REFERENCES users (id)
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_gallery_slideshow_order
+            ON gallery_slideshow_items (is_active, sort_order, id)
+        """
+    )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS committees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            created_by INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted_at TEXT,
+            deleted_by INTEGER,
+            FOREIGN KEY (created_by) REFERENCES users (id),
+            FOREIGN KEY (deleted_by) REFERENCES users (id)
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS committee_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            committee_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            title TEXT,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (committee_id, user_id),
+            FOREIGN KEY (committee_id) REFERENCES committees (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_committees_active
+            ON committees (deleted_at, name)
+        """
+    )
+    db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_committee_members_committee
+            ON committee_members (committee_id, sort_order, id)
+        """
+    )
 
     existing_slip_columns = {
         row["name"] for row in db.execute("PRAGMA table_info(deposit_slips)").fetchall()
@@ -734,6 +870,82 @@ def migrate_db() -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_finance_offerings_date
             ON finance_offerings (deleted_at, offering_date, deposit_slip_id)
+        """
+    )
+    db.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_live_sessions_status
+            ON live_sessions (status, started_at);
+        CREATE INDEX IF NOT EXISTS idx_users_active_role
+            ON users (deleted_at, is_active, role, full_name);
+        CREATE INDEX IF NOT EXISTS idx_users_last_seen
+            ON users (deleted_at, last_seen_at);
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_read
+            ON notifications (user_id, is_read, created_at);
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_category_created
+            ON notifications (user_id, category, created_at);
+        CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash
+            ON password_reset_tokens (token_hash, expires_at, used_at);
+        CREATE INDEX IF NOT EXISTS idx_announcements_active
+            ON announcements (deleted_at, is_pinned, created_at);
+        CREATE INDEX IF NOT EXISTS idx_announcements_reminder
+            ON announcements (deleted_at, reminder_at, reminder_sent_at);
+        CREATE INDEX IF NOT EXISTS idx_gallery_media_category
+            ON gallery_media (deleted_at, category_id, event_at, created_at);
+        CREATE INDEX IF NOT EXISTS idx_gallery_media_kind_created
+            ON gallery_media (deleted_at, media_kind, created_at);
+        CREATE INDEX IF NOT EXISTS idx_gallery_media_updated
+            ON gallery_media (deleted_at, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_gallery_slideshow_order
+            ON gallery_slideshow_items (is_active, sort_order, id);
+        CREATE INDEX IF NOT EXISTS idx_committees_active
+            ON committees (deleted_at, name);
+        CREATE INDEX IF NOT EXISTS idx_committee_members_committee
+            ON committee_members (committee_id, sort_order, id);
+        CREATE INDEX IF NOT EXISTS idx_webrtc_signals_session
+            ON webrtc_signals (live_session_id, viewer_token, id);
+        CREATE INDEX IF NOT EXISTS idx_messages_pair
+            ON messages (sender_id, recipient_id, id);
+        CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread
+            ON messages (recipient_id, is_read, id);
+        CREATE INDEX IF NOT EXISTS idx_messages_thread_updated
+            ON messages (recipient_id, sender_id, updated_at, id);
+        CREATE INDEX IF NOT EXISTS idx_message_attachments_message
+            ON message_attachments (message_id);
+        CREATE INDEX IF NOT EXISTS idx_live_recordings_session
+            ON live_recordings (live_session_id, deleted_at);
+        CREATE INDEX IF NOT EXISTS idx_live_comments_session
+            ON live_comments (live_session_id, id);
+        CREATE INDEX IF NOT EXISTS idx_live_reactions_session
+            ON live_reactions (live_session_id, reaction_type);
+        CREATE INDEX IF NOT EXISTS idx_timeline_posts_created
+            ON timeline_posts (deleted_at, created_at);
+        CREATE INDEX IF NOT EXISTS idx_timeline_posts_visibility_created
+            ON timeline_posts (deleted_at, visibility, created_at);
+        CREATE INDEX IF NOT EXISTS idx_timeline_posts_event
+            ON timeline_posts (event_date, created_at);
+        CREATE INDEX IF NOT EXISTS idx_timeline_post_viewers_user
+            ON timeline_post_viewers (user_id, post_id);
+        CREATE INDEX IF NOT EXISTS idx_timeline_media_post
+            ON timeline_media (post_id, sort_order);
+        CREATE INDEX IF NOT EXISTS idx_timeline_comments_post
+            ON timeline_comments (post_id, id);
+        CREATE INDEX IF NOT EXISTS idx_timeline_reactions_post
+            ON timeline_reactions (post_id, reaction_type);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_created
+            ON audit_logs (created_at, user_id);
+        CREATE INDEX IF NOT EXISTS idx_deposit_slips_visibility
+            ON deposit_slips (is_visible, visible_until, deposit_date);
+        CREATE INDEX IF NOT EXISTS idx_deposit_slips_approval_visible
+            ON deposit_slips (deleted_at, approval_status, is_visible, visible_until);
+        CREATE INDEX IF NOT EXISTS idx_finance_offerings_date
+            ON finance_offerings (deleted_at, offering_date, deposit_slip_id);
+        CREATE INDEX IF NOT EXISTS idx_visitors_membership_status
+            ON visitors (membership_status, membership_requested_at);
+        CREATE INDEX IF NOT EXISTS idx_visitors_follow_up
+            ON visitors (follow_up_status, follow_up_requested, visit_date);
+        CREATE INDEX IF NOT EXISTS idx_visitors_visit_date
+            ON visitors (visit_date);
         """
     )
     db.commit()

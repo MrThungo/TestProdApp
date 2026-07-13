@@ -400,42 +400,26 @@ def reset_password_with_token(token: str, password: str) -> sqlite3.Row | None:
 
 
 def count_users() -> dict[str, int]:
-    db = get_db()
+    row = get_db().execute(
+        """
+        SELECT
+            COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) AS active,
+            COALESCE(SUM(CASE WHEN role = 'pastor' THEN 1 ELSE 0 END), 0) AS pastors,
+            COALESCE(SUM(CASE WHEN role = 'member' THEN 1 ELSE 0 END), 0) AS members,
+            COALESCE(SUM(CASE WHEN role = 'usher' THEN 1 ELSE 0 END), 0) AS ushers,
+            COALESCE(SUM(CASE WHEN role = 'videographer' THEN 1 ELSE 0 END), 0) AS videographers,
+            COALESCE(SUM(CASE WHEN role = 'treasurer' THEN 1 ELSE 0 END), 0) AS treasurers
+        FROM users
+        WHERE deleted_at IS NULL
+        """
+    ).fetchone()
     return {
-        "active": db.execute(
-            "SELECT COUNT(*) AS count FROM users WHERE is_active = 1 AND deleted_at IS NULL"
-        ).fetchone()[
-            "count"
-        ],
-        "pastors": db.execute(
-            "SELECT COUNT(*) AS count FROM users WHERE role = 'pastor' AND deleted_at IS NULL"
-        ).fetchone()[
-            "count"
-        ],
-        "members": db.execute(
-            "SELECT COUNT(*) AS count FROM users WHERE role = 'member' AND deleted_at IS NULL"
-        ).fetchone()[
-            "count"
-        ],
-        "ushers": db.execute(
-            "SELECT COUNT(*) AS count FROM users WHERE role = 'usher' AND deleted_at IS NULL"
-        ).fetchone()[
-            "count"
-        ],
-        "videographers": db.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM users
-            WHERE role = 'videographer' AND deleted_at IS NULL
-            """
-        ).fetchone()["count"],
-        "treasurers": db.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM users
-            WHERE role = 'treasurer' AND deleted_at IS NULL
-            """
-        ).fetchone()["count"],
+        "active": int(row["active"]),
+        "pastors": int(row["pastors"]),
+        "members": int(row["members"]),
+        "ushers": int(row["ushers"]),
+        "videographers": int(row["videographers"]),
+        "treasurers": int(row["treasurers"]),
     }
 
 
@@ -775,7 +759,23 @@ def permanently_delete_user(user_id: int) -> None:
         db.execute("DELETE FROM live_sessions WHERE started_by = ?", (user_id,))
 
         db.execute("DELETE FROM announcements WHERE created_by = ?", (user_id,))
+        db.execute(
+            """
+            DELETE FROM gallery_slideshow_items
+            WHERE media_id IN (SELECT id FROM gallery_media WHERE uploaded_by = ?)
+            """,
+            (user_id,),
+        )
         db.execute("DELETE FROM gallery_media WHERE uploaded_by = ?", (user_id,))
+        db.execute("DELETE FROM gallery_slideshow_items WHERE added_by = ?", (user_id,))
+        db.execute(
+            """
+            DELETE FROM committee_members
+            WHERE committee_id IN (SELECT id FROM committees WHERE created_by = ?)
+            """,
+            (user_id,),
+        )
+        db.execute("DELETE FROM committees WHERE created_by = ?", (user_id,))
         db.execute(
             """
             UPDATE finance_offerings
@@ -790,6 +790,7 @@ def permanently_delete_user(user_id: int) -> None:
         optional_user_refs = (
             ("users", "created_by"),
             ("users", "deleted_by"),
+            ("committees", "deleted_by"),
             ("visitors", "captured_by"),
             ("visitors", "follow_up_made_by"),
             ("visitors", "membership_reviewed_by"),
@@ -809,6 +810,7 @@ def permanently_delete_user(user_id: int) -> None:
         for table, column in optional_user_refs:
             db.execute(f"UPDATE {table} SET {column} = NULL WHERE {column} = ?", (user_id,))
 
+        db.execute("DELETE FROM committee_members WHERE user_id = ?", (user_id,))
         db.execute("DELETE FROM users WHERE id = ? AND deleted_at IS NOT NULL", (user_id,))
         db.commit()
     except Exception:

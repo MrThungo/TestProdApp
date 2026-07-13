@@ -9,6 +9,7 @@ from back_to_god.services.audit import log_event
 from back_to_god.services.gallery import (
     can_manage_gallery,
     create_gallery_media,
+    gallery_summary,
     gallery_media_bytes,
     gallery_media_count,
     get_gallery_media,
@@ -16,7 +17,9 @@ from back_to_god.services.gallery import (
     list_categories,
     list_gallery_category_groups,
     list_gallery_media,
+    list_gallery_slideshow_picker,
     soft_delete_gallery_media,
+    update_gallery_slideshow,
 )
 
 
@@ -38,6 +41,10 @@ def _gallery_return_base(query: str, media_kind: str, category_id: int, page: in
     if page > 1:
         args["page"] = page
     return url_for("gallery.index", **args)
+
+
+def _media_etag(prefix: str, item) -> str:
+    return f"{prefix}-{item['id']}-{item['updated_at']}-{item['size_bytes']}"
 
 
 @bp.route("/", methods=("GET", "POST"))
@@ -98,6 +105,8 @@ def index():
         media_kind=media_kind,
         category_id=category_id,
         can_manage_gallery=_can_manage_gallery(),
+        slideshow_picker_items=list_gallery_slideshow_picker() if _can_manage_gallery() else [],
+        gallery_summary=gallery_summary(),
         pagination=pagination,
         latest_update=latest_gallery_update(),
         gallery_return_base=_gallery_return_base(
@@ -107,6 +116,18 @@ def index():
             int(pagination["page"]),
         ),
     )
+
+
+@bp.post("/slideshow")
+@login_required
+def update_slideshow():
+    if not _can_manage_gallery():
+        abort(403)
+    validate_csrf()
+    saved = update_gallery_slideshow(request.form, g.user["id"])
+    log_event("gallery_slideshow_updated", g.user["id"], "gallery", None, f"{saved} items")
+    flash(f"Landing page slideshow updated with {saved} item(s).", "success")
+    return redirect(url_for("gallery.index", _anchor="gallery-slideshow-admin"))
 
 
 @bp.get("/poll")
@@ -163,16 +184,24 @@ def media(media_id: int):
     item = get_gallery_media(media_id)
     if item is None:
         abort(404)
+    etag = _media_etag("gallery", item)
     headers = {
         "Cache-Control": "private, max-age=86400",
         "Content-Length": str(item["size_bytes"]),
         "Content-Disposition": f"inline; filename=\"{item['original_name'] or 'gallery-media'}\"",
     }
-    return Response(
+    if request.if_none_match.contains(etag):
+        response = Response(status=304, headers={"Cache-Control": headers["Cache-Control"]})
+        response.set_etag(etag)
+        return response
+
+    response = Response(
         stream_with_context(gallery_media_bytes(media_id)),
         mimetype=item["mime_type"],
         headers=headers,
     )
+    response.set_etag(etag)
+    return response
 
 
 @bp.get("/media/<int:media_id>/view")

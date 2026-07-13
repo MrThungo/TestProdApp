@@ -197,6 +197,28 @@ def latest_gallery_update() -> str:
     return row["latest_update"] if row else ""
 
 
+def gallery_summary() -> dict[str, int | str]:
+    row = get_db().execute(
+        """
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN media_kind = 'image' THEN 1 ELSE 0 END) AS photos,
+            SUM(CASE WHEN media_kind = 'video' THEN 1 ELSE 0 END) AS videos,
+            COUNT(DISTINCT category_id) AS categories,
+            COALESCE(MAX(updated_at), '') AS latest_update
+        FROM gallery_media
+        WHERE deleted_at IS NULL
+        """
+    ).fetchone()
+    return {
+        "total": int(row["total"] or 0),
+        "photos": int(row["photos"] or 0),
+        "videos": int(row["videos"] or 0),
+        "categories": int(row["categories"] or 0),
+        "latest_update": row["latest_update"] or "",
+    }
+
+
 def list_gallery_media(
     query: str = "",
     media_kind: str = "",
@@ -234,32 +256,151 @@ def list_gallery_media(
     ).fetchall()
 
 
+def list_gallery_slideshow() -> list[sqlite3.Row]:
+    return get_db().execute(
+        """
+        SELECT
+            gallery_media.id,
+            gallery_media.title,
+            gallery_media.description,
+            gallery_media.event_at,
+            gallery_media.media_kind,
+            gallery_media.mime_type,
+            gallery_media.created_at,
+            gallery_categories.name AS category_name,
+            users.full_name AS uploaded_by_name,
+            gallery_slideshow_items.caption AS slideshow_caption,
+            gallery_slideshow_items.sort_order AS slideshow_sort_order
+        FROM gallery_slideshow_items
+        JOIN gallery_media ON gallery_media.id = gallery_slideshow_items.media_id
+        JOIN gallery_categories ON gallery_categories.id = gallery_media.category_id
+        JOIN users ON users.id = gallery_media.uploaded_by
+        WHERE gallery_slideshow_items.is_active = 1
+          AND gallery_media.deleted_at IS NULL
+        ORDER BY gallery_slideshow_items.sort_order, gallery_slideshow_items.id
+        """
+    ).fetchall()
+
+
+def list_gallery_slideshow_picker(limit: int = 120) -> list[sqlite3.Row]:
+    return get_db().execute(
+        """
+        SELECT
+            gallery_media.id,
+            gallery_media.title,
+            gallery_media.media_kind,
+            gallery_media.event_at,
+            gallery_media.created_at,
+            gallery_categories.name AS category_name,
+            gallery_slideshow_items.caption AS slideshow_caption,
+            gallery_slideshow_items.sort_order AS slideshow_sort_order,
+            CASE WHEN gallery_slideshow_items.id IS NULL THEN 0 ELSE 1 END AS is_selected
+        FROM gallery_media
+        JOIN gallery_categories ON gallery_categories.id = gallery_media.category_id
+        LEFT JOIN gallery_slideshow_items
+          ON gallery_slideshow_items.media_id = gallery_media.id
+         AND gallery_slideshow_items.is_active = 1
+        WHERE gallery_media.deleted_at IS NULL
+        ORDER BY
+            is_selected DESC,
+            COALESCE(gallery_slideshow_items.sort_order, 9999),
+            datetime(COALESCE(NULLIF(gallery_media.event_at, ''), gallery_media.created_at)) DESC,
+            gallery_media.id DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+
+
+def update_gallery_slideshow(form, updated_by: int) -> int:
+    selected_ids: list[int] = []
+    for value in form.getlist("slideshow_media_id"):
+        try:
+            media_id = int(value)
+        except (TypeError, ValueError):
+            continue
+        if media_id > 0 and media_id not in selected_ids:
+            selected_ids.append(media_id)
+
+    db = get_db()
+    now = utc_now()
+    db.execute("DELETE FROM gallery_slideshow_items")
+    saved = 0
+    for position, media_id in enumerate(selected_ids, start=1):
+        media = db.execute(
+            "SELECT id FROM gallery_media WHERE id = ? AND deleted_at IS NULL",
+            (media_id,),
+        ).fetchone()
+        if media is None:
+            continue
+
+        try:
+            sort_order = int(form.get(f"slideshow_order_{media_id}", position))
+        except (TypeError, ValueError):
+            sort_order = position
+        caption = normalize_text(form.get(f"slideshow_caption_{media_id}", ""), 180)
+        db.execute(
+            """
+            INSERT INTO gallery_slideshow_items (
+                media_id, caption, sort_order, is_active, added_by, created_at, updated_at
+            )
+            VALUES (?, ?, ?, 1, ?, ?, ?)
+            """,
+            (media_id, caption, sort_order, updated_by, now, now),
+        )
+        saved += 1
+
+    db.commit()
+    return saved
+
+
 def list_gallery_category_groups(
     query: str = "",
     media_kind: str = "",
 ) -> list[dict]:
-    groups: dict[int, dict] = {}
-    for media in list_gallery_media(query, media_kind, 0, 5000, 0):
-        category_id = int(media["category_id"])
-        if category_id not in groups:
-            groups[category_id] = {
-                "id": category_id,
-                "name": media["category_name"],
-                "media_count": 0,
-                "image_count": 0,
-                "video_count": 0,
-                "preview_media_id": media["id"],
-                "preview_media_kind": media["media_kind"],
-                "preview_title": media["title"],
-                "latest_at": media["event_at"] or media["created_at"],
-            }
-        group = groups[category_id]
-        group["media_count"] += 1
-        if media["media_kind"] == "image":
-            group["image_count"] += 1
-        if media["media_kind"] == "video":
-            group["video_count"] += 1
-    return sorted(groups.values(), key=lambda item: item["latest_at"] or "", reverse=True)
+    where, params = _gallery_where(query, media_kind, 0)
+    rows = get_db().execute(
+        f"""
+        WITH ranked_media AS (
+            SELECT
+                gallery_media.id,
+                gallery_media.category_id,
+                gallery_media.title,
+                gallery_media.media_kind,
+                gallery_categories.name AS category_name,
+                COALESCE(NULLIF(gallery_media.event_at, ''), gallery_media.created_at) AS latest_at,
+                ROW_NUMBER() OVER (
+                    PARTITION BY gallery_media.category_id
+                    ORDER BY datetime(COALESCE(NULLIF(gallery_media.event_at, ''), gallery_media.created_at)) DESC,
+                             gallery_media.id DESC
+                ) AS row_number,
+                COUNT(*) OVER (PARTITION BY gallery_media.category_id) AS media_count,
+                SUM(CASE WHEN gallery_media.media_kind = 'image' THEN 1 ELSE 0 END)
+                    OVER (PARTITION BY gallery_media.category_id) AS image_count,
+                SUM(CASE WHEN gallery_media.media_kind = 'video' THEN 1 ELSE 0 END)
+                    OVER (PARTITION BY gallery_media.category_id) AS video_count
+            FROM gallery_media
+            JOIN gallery_categories ON gallery_categories.id = gallery_media.category_id
+            JOIN users ON users.id = gallery_media.uploaded_by
+            WHERE {where}
+        )
+        SELECT
+            category_id AS id,
+            category_name AS name,
+            media_count,
+            image_count,
+            video_count,
+            id AS preview_media_id,
+            media_kind AS preview_media_kind,
+            title AS preview_title,
+            latest_at
+        FROM ranked_media
+        WHERE row_number = 1
+        ORDER BY datetime(latest_at) DESC, id DESC
+        """,
+        tuple(params),
+    ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def get_gallery_media(media_id: int) -> sqlite3.Row | None:

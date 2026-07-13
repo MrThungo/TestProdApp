@@ -539,7 +539,7 @@ async function pingPresence() {
 
 if (document.body && csrfToken) {
   let notificationTimer = null;
-  const scheduleNotificationPoll = (delay = document.hidden ? 14000 : 5000) => {
+  const scheduleNotificationPoll = (delay = document.hidden ? 60000 : 15000) => {
     window.clearTimeout(notificationTimer);
     notificationTimer = window.setTimeout(async () => {
       await pollNotifications();
@@ -547,10 +547,10 @@ if (document.body && csrfToken) {
     }, delay);
   };
 
-  window.setInterval(pingPresence, 25000);
+  window.setInterval(pingPresence, 120000);
   pollNotifications();
   scheduleNotificationPoll();
-  document.addEventListener("visibilitychange", () => scheduleNotificationPoll(1200));
+  document.addEventListener("visibilitychange", () => scheduleNotificationPoll(2500));
 }
 
 const protectedFinance = document.querySelector("[data-protected-finance]");
@@ -724,7 +724,7 @@ function initLiveFragments(root = document) {
 
     const poll = async () => {
       if (!document.body.contains(fragment)) return;
-      let delay = document.hidden ? 30000 : 8000;
+      let delay = document.hidden ? 60000 : 15000;
       if (liveFragmentHasDraft(fragment)) {
         window.setTimeout(poll, delay);
         return;
@@ -745,6 +745,7 @@ function initLiveFragments(root = document) {
             fragment.remove();
             if (replacement?.matches("[data-live-fragment]")) {
               initLiveFragments(document);
+              initGalleryBrowsers(replacement);
             }
             return;
           }
@@ -755,12 +756,233 @@ function initLiveFragments(root = document) {
       window.setTimeout(poll, delay);
     };
 
-    window.setTimeout(poll, document.hidden ? 30000 : 8000);
+    window.setTimeout(poll, document.hidden ? 60000 : 15000);
   });
 }
 
 initLiveFragments();
 document.addEventListener("visibilitychange", () => initLiveFragments());
+
+function getGalleryLightbox() {
+  let lightbox = document.querySelector("[data-gallery-lightbox-modal]");
+  if (lightbox) return lightbox;
+
+  lightbox = document.createElement("section");
+  lightbox.className = "gallery-lightbox";
+  lightbox.dataset.galleryLightboxModal = "1";
+  lightbox.setAttribute("aria-modal", "true");
+  lightbox.setAttribute("role", "dialog");
+  lightbox.setAttribute("aria-label", "Gallery media viewer");
+  lightbox.innerHTML = `
+    <header class="gallery-lightbox-header">
+      <div class="gallery-lightbox-title">
+        <strong data-gallery-lightbox-title></strong>
+        <small data-gallery-lightbox-meta></small>
+      </div>
+      <div class="gallery-lightbox-actions">
+        <a class="gallery-lightbox-button" data-gallery-lightbox-open href="#" aria-label="Open full page" title="Open full page">
+          <span class="material-symbols-rounded">open_in_new</span>
+        </a>
+        <button class="gallery-lightbox-button" type="button" data-gallery-lightbox-fullscreen aria-label="Fullscreen" title="Fullscreen">
+          <span class="material-symbols-rounded">fullscreen</span>
+        </button>
+        <button class="gallery-lightbox-button" type="button" data-gallery-lightbox-close aria-label="Close" title="Close">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+    </header>
+    <div class="gallery-lightbox-stage">
+      <button class="gallery-lightbox-button gallery-lightbox-step previous" type="button" data-gallery-lightbox-prev aria-label="Previous media">
+        <span class="material-symbols-rounded">chevron_left</span>
+      </button>
+      <div class="gallery-lightbox-media" data-gallery-lightbox-media></div>
+      <button class="gallery-lightbox-button gallery-lightbox-step next" type="button" data-gallery-lightbox-next aria-label="Next media">
+        <span class="material-symbols-rounded">chevron_right</span>
+      </button>
+    </div>
+    <footer class="gallery-lightbox-footer">
+      <p data-gallery-lightbox-description></p>
+      <div class="gallery-lightbox-nav">
+        <button class="gallery-lightbox-button" type="button" data-gallery-lightbox-prev aria-label="Previous media">
+          <span class="material-symbols-rounded">arrow_back</span>
+        </button>
+        <button class="gallery-lightbox-button" type="button" data-gallery-lightbox-next aria-label="Next media">
+          <span class="material-symbols-rounded">arrow_forward</span>
+        </button>
+      </div>
+    </footer>
+  `;
+  document.body.appendChild(lightbox);
+  return lightbox;
+}
+
+function initGalleryBrowsers(root = document) {
+  const browsers = root.matches?.("[data-gallery-browser]")
+    ? [root]
+    : [...root.querySelectorAll("[data-gallery-browser]")];
+  browsers.forEach((browser) => {
+    if (browser.dataset.galleryBrowserReady === "1") return;
+    browser.dataset.galleryBrowserReady = "1";
+
+    const storageKey = "btg-gallery-view-mode";
+    const cards = [...browser.querySelectorAll("[data-gallery-lightbox]")];
+    const viewButtons = [...browser.querySelectorAll("[data-gallery-view-button]")];
+    let activeIndex = 0;
+    let lastFocused = null;
+
+    function setViewMode(mode) {
+      const selectedMode = ["mosaic", "cinema", "compact"].includes(mode) ? mode : "mosaic";
+      browser.dataset.galleryView = selectedMode;
+      viewButtons.forEach((button) => {
+        const active = button.dataset.galleryViewButton === selectedMode;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      try {
+        window.localStorage.setItem(storageKey, selectedMode);
+      } catch {
+        // View preference remains page-local if storage is unavailable.
+      }
+    }
+
+    function getSavedViewMode() {
+      try {
+        return window.localStorage.getItem(storageKey) || browser.dataset.galleryView || "mosaic";
+      } catch {
+        return browser.dataset.galleryView || "mosaic";
+      }
+    }
+
+    function currentItem() {
+      return cards[activeIndex];
+    }
+
+    function pauseLightboxMedia(lightbox) {
+      lightbox.querySelectorAll("video").forEach((video) => video.pause());
+    }
+
+    function setLightboxFullscreen(lightbox, enabled) {
+      const icon = lightbox.querySelector("[data-gallery-lightbox-fullscreen] .material-symbols-rounded");
+      lightbox.classList.toggle("is-native-fullscreen", enabled);
+      if (icon) icon.textContent = enabled ? "fullscreen_exit" : "fullscreen";
+    }
+
+    function renderLightbox(index) {
+      if (!cards.length) return;
+      activeIndex = (index + cards.length) % cards.length;
+      const item = currentItem();
+      const lightbox = getGalleryLightbox();
+      const mediaHost = lightbox.querySelector("[data-gallery-lightbox-media]");
+      const title = lightbox.querySelector("[data-gallery-lightbox-title]");
+      const meta = lightbox.querySelector("[data-gallery-lightbox-meta]");
+      const description = lightbox.querySelector("[data-gallery-lightbox-description]");
+      const openLink = lightbox.querySelector("[data-gallery-lightbox-open]");
+
+      pauseLightboxMedia(lightbox);
+      mediaHost.replaceChildren();
+      title.textContent = item.dataset.mediaTitle || "Gallery media";
+      meta.textContent = item.dataset.mediaMeta || "";
+      description.textContent = item.dataset.mediaDescription || "";
+      openLink.href = item.dataset.mediaViewUrl || item.href;
+
+      if (item.dataset.mediaKind === "video") {
+        const video = document.createElement("video");
+        video.controls = true;
+        video.autoplay = true;
+        video.playsInline = true;
+        video.src = item.dataset.mediaUrl || item.href;
+        mediaHost.appendChild(video);
+        video.play().catch(() => {});
+      } else {
+        const image = document.createElement("img");
+        image.src = item.dataset.mediaUrl || item.href;
+        image.alt = item.dataset.mediaTitle || "";
+        mediaHost.appendChild(image);
+      }
+    }
+
+    function openLightbox(index) {
+      if (!cards.length) return;
+      lastFocused = document.activeElement;
+      const lightbox = getGalleryLightbox();
+      renderLightbox(index);
+      lightbox.galleryClose = closeLightbox;
+      lightbox.galleryStep = stepLightbox;
+      lightbox.galleryFullscreen = toggleLightboxFullscreen;
+      lightbox.classList.add("is-open");
+      document.body.classList.add("gallery-lightbox-open");
+      lightbox.querySelector("[data-gallery-lightbox-close]")?.focus({ preventScroll: true });
+    }
+
+    function closeLightbox() {
+      const lightbox = getGalleryLightbox();
+      pauseLightboxMedia(lightbox);
+      lightbox.classList.remove("is-open");
+      document.body.classList.remove("gallery-lightbox-open");
+      if (document.fullscreenElement === lightbox) {
+        document.exitFullscreen().catch(() => {});
+      }
+      lastFocused?.focus?.({ preventScroll: true });
+    }
+
+    function stepLightbox(direction) {
+      if (!getGalleryLightbox().classList.contains("is-open")) return;
+      renderLightbox(activeIndex + direction);
+    }
+
+    function toggleLightboxFullscreen() {
+      const lightbox = getGalleryLightbox();
+      if (!lightbox.classList.contains("is-open")) return;
+      if (document.fullscreenElement === lightbox) {
+        document.exitFullscreen().catch(() => {});
+        return;
+      }
+      if (lightbox.requestFullscreen) {
+        lightbox.requestFullscreen().catch(() => {});
+      }
+    }
+
+    viewButtons.forEach((button) => {
+      button.addEventListener("click", () => setViewMode(button.dataset.galleryViewButton || "mosaic"));
+    });
+    cards.forEach((card, index) => {
+      card.addEventListener("click", (event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1) return;
+        event.preventDefault();
+        openLightbox(index);
+      });
+    });
+
+    const lightbox = getGalleryLightbox();
+    if (lightbox.dataset.galleryLightboxReady !== "1") {
+      lightbox.dataset.galleryLightboxReady = "1";
+      lightbox.addEventListener("click", (event) => {
+        const close = event.target.closest("[data-gallery-lightbox-close]");
+        const previous = event.target.closest("[data-gallery-lightbox-prev]");
+        const next = event.target.closest("[data-gallery-lightbox-next]");
+        const fullscreen = event.target.closest("[data-gallery-lightbox-fullscreen]");
+        if (close) lightbox.galleryClose?.();
+        if (previous) lightbox.galleryStep?.(-1);
+        if (next) lightbox.galleryStep?.(1);
+        if (fullscreen) lightbox.galleryFullscreen?.();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (!lightbox.classList.contains("is-open")) return;
+        if (event.key === "Escape") lightbox.galleryClose?.();
+        if (event.key === "ArrowLeft") lightbox.galleryStep?.(-1);
+        if (event.key === "ArrowRight") lightbox.galleryStep?.(1);
+        if (event.key.toLowerCase() === "f") lightbox.galleryFullscreen?.();
+      });
+      document.addEventListener("fullscreenchange", () => {
+        setLightboxFullscreen(lightbox, document.fullscreenElement === lightbox);
+      });
+    }
+
+    setViewMode(getSavedViewMode());
+  });
+}
+
+initGalleryBrowsers();
 
 let timelineFeed = document.querySelector("[data-timeline-feed]");
 
@@ -807,7 +1029,7 @@ async function pollTimelineFeed() {
 }
 
 if (timelineFeed) {
-  window.setInterval(pollTimelineFeed, 4500);
+  window.setInterval(pollTimelineFeed, 15000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) pollTimelineFeed();
   });
@@ -1383,7 +1605,13 @@ if (chatThread) {
 
   messagesContainer?.querySelectorAll("[data-message-id]").forEach(attachMessageActions);
   scrollChatToEnd();
-  window.setInterval(pollChat, 1800);
+
+  async function scheduleChatPoll() {
+    await pollChat();
+    window.setTimeout(scheduleChatPoll, document.hidden ? 15000 : 4500);
+  }
+
+  scheduleChatPoll();
 }
 
 async function postLiveSignal(url, data) {
@@ -1671,8 +1899,14 @@ if (liveStudio) {
       liveRecorder.stop();
     }
   });
+  async function scheduleStudioSignals() {
+    await handleStudioSignals();
+    const delay = document.hidden ? 15000 : 2000;
+    window.setTimeout(scheduleStudioSignals, delay);
+  }
+
   if ("RTCPeerConnection" in window) {
-    window.setInterval(handleStudioSignals, 1200);
+    scheduleStudioSignals();
   }
 }
 
@@ -1755,8 +1989,22 @@ if (liveWatch && "RTCPeerConnection" in window) {
   } else {
     startWatching();
   }
-  window.setInterval(handleWatchSignals, 850);
-  window.setInterval(pollLiveStatus, 2500);
+  async function scheduleWatchSignals() {
+    await handleWatchSignals();
+    if (watchIsEnded) return;
+    const connected = peer.connectionState === "connected" || peer.iceConnectionState === "connected";
+    const delay = document.hidden ? 12000 : connected ? 3500 : 900;
+    window.setTimeout(scheduleWatchSignals, delay);
+  }
+
+  async function scheduleLiveStatus() {
+    await pollLiveStatus();
+    if (watchIsEnded) return;
+    window.setTimeout(scheduleLiveStatus, document.hidden ? 30000 : 6500);
+  }
+
+  scheduleWatchSignals();
+  scheduleLiveStatus();
 }
 
 const liveEngagement = document.querySelector("[data-live-engagement]");
@@ -1858,5 +2106,300 @@ if (liveEngagement) {
     });
   });
 
-  window.setInterval(pollEngagement, 1800);
+  window.setInterval(pollEngagement, 5000);
 }
+
+document.querySelectorAll("[data-gallery-slideshow]").forEach((slideshow) => {
+  const fullscreenTarget = slideshow.querySelector(".advanced-slideshow") || slideshow;
+  const slides = [...slideshow.querySelectorAll("[data-slideshow-slide]")];
+  const dots = [...slideshow.querySelectorAll("[data-slideshow-dot]")];
+  const thumbs = [...slideshow.querySelectorAll("[data-slideshow-thumb]")];
+  const previousButton = slideshow.querySelector("[data-slideshow-prev]");
+  const nextButton = slideshow.querySelector("[data-slideshow-next]");
+  const pauseButton = slideshow.querySelector("[data-slideshow-pause]");
+  const pauseIcon = pauseButton?.querySelector(".material-symbols-rounded");
+  const fullscreenButton = slideshow.querySelector("[data-slideshow-fullscreen]");
+  const fullscreenIcon = fullscreenButton?.querySelector(".material-symbols-rounded");
+  const progressBar = slideshow.querySelector("[data-slideshow-progress]");
+  const currentCounter = slideshow.querySelector("[data-slideshow-current]");
+  const intervalMs = Math.max(3500, Number(slideshow.dataset.autoplayInterval || 8500));
+  let activeIndex = Math.max(0, slides.findIndex((slide) => slide.classList.contains("is-active")));
+  let frameId = null;
+  let startedAt = 0;
+  let elapsedBeforePause = 0;
+  let pausedByUser = false;
+  let pointerStartX = 0;
+  let pointerStartY = 0;
+  let pointerTracking = false;
+
+  if (!slides.length) return;
+
+  function formatSlideNumber(index) {
+    return String(index + 1).padStart(2, "0");
+  }
+
+  function setProgress(value) {
+    if (!progressBar) return;
+    progressBar.style.transform = `scaleX(${Math.max(0, Math.min(1, value))})`;
+  }
+
+  function syncVideo(slide, shouldPlay) {
+    slide.querySelectorAll("video").forEach((video) => {
+      if (shouldPlay) {
+        video.muted = true;
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+      }
+    });
+  }
+
+  function syncControls() {
+    if (currentCounter) {
+      currentCounter.textContent = formatSlideNumber(activeIndex);
+    }
+    dots.forEach((dot, index) => {
+      dot.classList.toggle("is-active", index === activeIndex);
+      dot.setAttribute("aria-current", index === activeIndex ? "true" : "false");
+    });
+    thumbs.forEach((thumb, index) => {
+      thumb.classList.toggle("is-active", index === activeIndex);
+      thumb.setAttribute("aria-current", index === activeIndex ? "true" : "false");
+      if (index === activeIndex) {
+        const rail = thumb.parentElement;
+        if (rail) {
+          const centeredLeft = thumb.offsetLeft - (rail.clientWidth - thumb.clientWidth) / 2;
+          rail.scrollTo({ left: centeredLeft, behavior: "smooth" });
+        }
+      }
+    });
+  }
+
+  function currentFullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement || null;
+  }
+
+  function isSlideshowFullscreen() {
+    return currentFullscreenElement() === fullscreenTarget || fullscreenTarget.classList.contains("is-faux-fullscreen");
+  }
+
+  function syncFullscreenButton() {
+    const isOpen = isSlideshowFullscreen();
+    slideshow.classList.toggle("is-fullscreen", isOpen);
+    fullscreenButton?.setAttribute("aria-label", isOpen ? "Exit slideshow fullscreen" : "Open slideshow fullscreen");
+    if (fullscreenIcon) {
+      fullscreenIcon.textContent = isOpen ? "fullscreen_exit" : "fullscreen";
+    }
+  }
+
+  function enterFallbackFullscreen() {
+    fullscreenTarget.classList.add("is-faux-fullscreen");
+    document.body.classList.add("slideshow-faux-fullscreen-active");
+    fullscreenTarget.focus({ preventScroll: true });
+    syncFullscreenButton();
+  }
+
+  function exitFallbackFullscreen() {
+    fullscreenTarget.classList.remove("is-faux-fullscreen");
+    document.body.classList.remove("slideshow-faux-fullscreen-active");
+    syncFullscreenButton();
+  }
+
+  function requestNativeFullscreen() {
+    const request =
+      fullscreenTarget.requestFullscreen ||
+      fullscreenTarget.webkitRequestFullscreen ||
+      fullscreenTarget.msRequestFullscreen;
+    return request ? request.call(fullscreenTarget) : null;
+  }
+
+  function exitNativeFullscreen() {
+    const exit =
+      document.exitFullscreen ||
+      document.webkitExitFullscreen ||
+      document.msExitFullscreen;
+    return exit ? exit.call(document) : null;
+  }
+
+  function toggleFullscreen() {
+    if (fullscreenTarget.classList.contains("is-faux-fullscreen")) {
+      exitFallbackFullscreen();
+      return;
+    }
+    if (currentFullscreenElement() === fullscreenTarget) {
+      const exitPromise = exitNativeFullscreen();
+      if (exitPromise?.catch) exitPromise.catch(() => {});
+      return;
+    }
+
+    let requestPromise = null;
+    try {
+      requestPromise = requestNativeFullscreen();
+    } catch {
+      enterFallbackFullscreen();
+      return;
+    }
+    if (requestPromise?.then) {
+      requestPromise.then(syncFullscreenButton).catch(enterFallbackFullscreen);
+    } else if (requestPromise === null) {
+      enterFallbackFullscreen();
+    } else {
+      syncFullscreenButton();
+    }
+  }
+
+  function showSlide(nextIndex) {
+    activeIndex = (nextIndex + slides.length) % slides.length;
+    slides.forEach((slide, index) => {
+      const isActive = index === activeIndex;
+      slide.classList.toggle("is-active", isActive);
+      slide.setAttribute("aria-hidden", isActive ? "false" : "true");
+      syncVideo(slide, isActive);
+    });
+    syncControls();
+  }
+
+  function cancelFrame() {
+    if (frameId) {
+      window.cancelAnimationFrame(frameId);
+      frameId = null;
+    }
+  }
+
+  function runTimer(now) {
+    if (pausedByUser || document.hidden || slides.length < 2) return;
+    const elapsed = elapsedBeforePause + (now - startedAt);
+    const progress = elapsed / intervalMs;
+    setProgress(progress);
+    if (progress >= 1) {
+      showSlide(activeIndex + 1);
+      elapsedBeforePause = 0;
+      startedAt = performance.now();
+      setProgress(0);
+    }
+    frameId = window.requestAnimationFrame(runTimer);
+  }
+
+  function startTimer(resetProgress = false) {
+    cancelFrame();
+    if (slides.length < 2) return;
+    if (resetProgress) {
+      elapsedBeforePause = 0;
+      setProgress(0);
+    }
+    startedAt = performance.now();
+    frameId = window.requestAnimationFrame(runTimer);
+  }
+
+  function pauseTimer(fromUser = false) {
+    if (!pausedByUser && !document.hidden) {
+      elapsedBeforePause += performance.now() - startedAt;
+    }
+    if (fromUser) {
+      pausedByUser = true;
+      slideshow.classList.add("is-paused");
+      pauseButton?.setAttribute("aria-label", "Resume slideshow");
+      if (pauseIcon) pauseIcon.textContent = "play_arrow";
+    }
+    cancelFrame();
+  }
+
+  function resumeTimer() {
+    pausedByUser = false;
+    slideshow.classList.remove("is-paused");
+    pauseButton?.setAttribute("aria-label", "Pause slideshow");
+    if (pauseIcon) pauseIcon.textContent = "pause";
+    startTimer(false);
+  }
+
+  function manualShow(nextIndex) {
+    showSlide(nextIndex);
+    pausedByUser = false;
+    slideshow.classList.remove("is-paused");
+    pauseButton?.setAttribute("aria-label", "Pause slideshow");
+    if (pauseIcon) pauseIcon.textContent = "pause";
+    startTimer(true);
+  }
+
+  previousButton?.addEventListener("click", () => {
+    manualShow(activeIndex - 1);
+  });
+  nextButton?.addEventListener("click", () => {
+    manualShow(activeIndex + 1);
+  });
+  dots.forEach((dot) => {
+    dot.addEventListener("click", () => {
+      manualShow(Number(dot.dataset.slideIndex || 0));
+    });
+  });
+  thumbs.forEach((thumb) => {
+    thumb.addEventListener("click", () => {
+      manualShow(Number(thumb.dataset.slideIndex || 0));
+    });
+  });
+  pauseButton?.addEventListener("click", () => {
+    if (pausedByUser) {
+      resumeTimer();
+    } else {
+      pauseTimer(true);
+    }
+  });
+  fullscreenButton?.addEventListener("click", toggleFullscreen);
+  slideshow.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      manualShow(activeIndex - 1);
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      manualShow(activeIndex + 1);
+    }
+    if (event.key === " " || event.key === "Spacebar") {
+      event.preventDefault();
+      if (pausedByUser) {
+        resumeTimer();
+      } else {
+        pauseTimer(true);
+      }
+    }
+    if (event.key.toLowerCase() === "f") {
+      event.preventDefault();
+      toggleFullscreen();
+    }
+    if (event.key === "Escape" && fullscreenTarget.classList.contains("is-faux-fullscreen")) {
+      event.preventDefault();
+      exitFallbackFullscreen();
+    }
+  });
+  slideshow.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse") return;
+    pointerStartX = event.clientX;
+    pointerStartY = event.clientY;
+    pointerTracking = true;
+  });
+  slideshow.addEventListener("pointerup", (event) => {
+    if (!pointerTracking) return;
+    pointerTracking = false;
+    const deltaX = event.clientX - pointerStartX;
+    const deltaY = event.clientY - pointerStartY;
+    if (Math.abs(deltaX) > 46 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
+      manualShow(activeIndex + (deltaX < 0 ? 1 : -1));
+    }
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      pauseTimer(false);
+      slides.forEach((slide) => syncVideo(slide, false));
+    } else if (!pausedByUser) {
+      syncVideo(slides[activeIndex], true);
+      startTimer(false);
+    }
+  });
+  document.addEventListener("fullscreenchange", syncFullscreenButton);
+  document.addEventListener("webkitfullscreenchange", syncFullscreenButton);
+  document.addEventListener("msfullscreenchange", syncFullscreenButton);
+
+  showSlide(activeIndex);
+  syncFullscreenButton();
+  startTimer(true);
+});

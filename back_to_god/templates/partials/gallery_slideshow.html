@@ -1,0 +1,77 @@
+{% if slideshow_items %}
+  <section class="advanced-slideshow-block {{ slideshow_section_class | default('') }}" data-gallery-slideshow data-autoplay-interval="{{ slideshow_interval | default(8500) }}">
+    <div class="section-heading slideshow-heading">
+      <p>{{ slideshow_eyebrow | default("Church gallery") }}</p>
+      <h2>{{ slideshow_title | default("Moments from the house.") }}</h2>
+      {% if slideshow_description | default("") %}
+        <span>{{ slideshow_description }}</span>
+      {% endif %}
+    </div>
+
+    <div class="advanced-slideshow" tabindex="0" aria-label="{{ slideshow_title | default('Church gallery slideshow') }}">
+      <div class="slideshow-progress" aria-hidden="true">
+        <span data-slideshow-progress></span>
+      </div>
+      <div class="slideshow-stage">
+        {% for item in slideshow_items %}
+          <article class="slideshow-slide {% if loop.first %}is-active{% endif %}" data-slideshow-slide data-slide-number="{{ loop.index }}" aria-hidden="{{ 'false' if loop.first else 'true' }}">
+            {% set media_url = url_for(slideshow_media_endpoint, media_id=item['id']) %}
+            <div class="slideshow-media">
+              {% if item["media_kind"] == "image" %}
+                <img src="{{ media_url }}" alt="{{ item['slideshow_caption'] or item['title'] }}" loading="{{ 'eager' if loop.first else 'lazy' }}" />
+              {% else %}
+                <video muted playsinline loop preload="metadata" src="{{ media_url }}"></video>
+              {% endif %}
+            </div>
+            <div class="slideshow-copy">
+              <span>{{ item["category_name"] }}</span>
+              <strong>{{ item["slideshow_caption"] or item["title"] }}</strong>
+              {% if item["description"] %}
+                <small>{{ item["description"] }}</small>
+              {% endif %}
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+
+      <div class="slideshow-meta" aria-hidden="true">
+        <span data-slideshow-current>01</span>
+        <em>/</em>
+        <span>{{ "%02d"|format(slideshow_items | length) }}</span>
+      </div>
+
+      <button class="slideshow-fullscreen" type="button" data-slideshow-fullscreen aria-label="Open slideshow fullscreen">
+        <span class="material-symbols-rounded">fullscreen</span>
+      </button>
+
+      {% if slideshow_items | length > 1 %}
+        <button class="slideshow-control previous" type="button" data-slideshow-prev aria-label="Previous slide">
+          <span class="material-symbols-rounded">chevron_left</span>
+        </button>
+        <button class="slideshow-control next" type="button" data-slideshow-next aria-label="Next slide">
+          <span class="material-symbols-rounded">chevron_right</span>
+        </button>
+        <button class="slideshow-pause" type="button" data-slideshow-pause aria-label="Pause slideshow">
+          <span class="material-symbols-rounded">pause</span>
+        </button>
+        <div class="slideshow-dots" aria-label="Slideshow slides">
+          {% for item in slideshow_items %}
+            <button class="{% if loop.first %}is-active{% endif %}" type="button" data-slideshow-dot data-slide-index="{{ loop.index0 }}" aria-label="Show slide {{ loop.index }}"></button>
+          {% endfor %}
+        </div>
+        <div class="slideshow-thumbnails" aria-label="Slideshow thumbnails">
+          {% for item in slideshow_items %}
+            {% set thumb_url = url_for(slideshow_media_endpoint, media_id=item['id']) %}
+            <button class="{% if loop.first %}is-active{% endif %}" type="button" data-slideshow-thumb data-slide-index="{{ loop.index0 }}" aria-label="Show {{ item['title'] }}">
+              {% if item["media_kind"] == "image" %}
+                <img src="{{ thumb_url }}" alt="" loading="lazy" />
+              {% else %}
+                <video muted playsinline preload="metadata" src="{{ thumb_url }}"></video>
+              {% endif %}
+            </button>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </section>
+{% endif %}

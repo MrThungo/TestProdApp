@@ -7,13 +7,35 @@
   <main class="gallery-shell">
     {% include "partials/flash.html" %}
 
-    <section class="gallery-hero">
-      <div>
+    <section class="gallery-hero gallery-command-center">
+      <div class="gallery-hero-copy">
         <p class="mb-2 text-xs font-black uppercase text-btg-gold">Church memories</p>
         <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Gallery</h1>
         <p class="mt-4 max-w-2xl leading-7 text-btg-muted">
           Admin-uploaded photos and videos, organised by category for services, fellowship, outreach, and events.
         </p>
+      </div>
+      <div class="gallery-stat-panel" aria-label="Gallery summary">
+        <article>
+          <span class="material-symbols-rounded">collections</span>
+          <strong>{{ gallery_summary["total"] }}</strong>
+          <small>Total media</small>
+        </article>
+        <article>
+          <span class="material-symbols-rounded">image</span>
+          <strong>{{ gallery_summary["photos"] }}</strong>
+          <small>Photos</small>
+        </article>
+        <article>
+          <span class="material-symbols-rounded">movie</span>
+          <strong>{{ gallery_summary["videos"] }}</strong>
+          <small>Videos</small>
+        </article>
+        <article>
+          <span class="material-symbols-rounded">category</span>
+          <strong>{{ gallery_summary["categories"] }}</strong>
+          <small>Collections</small>
+        </article>
       </div>
       <form class="gallery-toolbar" method="get" action="{{ url_for('gallery.index') }}">
         <label>
@@ -81,6 +103,54 @@
             <span class="material-symbols-rounded text-[20px]">upload</span>
             <span>Upload to gallery</span>
           </button>
+        </form>
+      </section>
+
+      <section class="gallery-slideshow-admin material-card" id="gallery-slideshow-admin">
+        <div>
+          <p class="text-xs font-black uppercase text-btg-gold">Landing page</p>
+          <h2 class="text-2xl font-black">Cinematic slideshow selection</h2>
+        </div>
+        <form class="grid gap-4" method="post" action="{{ url_for('gallery.update_slideshow') }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />
+          {% if slideshow_picker_items %}
+            <div class="slideshow-picker-grid">
+              {% for item in slideshow_picker_items %}
+                <article class="slideshow-picker-card">
+                  <label class="slideshow-picker-choice">
+                    <input type="checkbox" name="slideshow_media_id" value="{{ item['id'] }}" {% if item["is_selected"] %}checked{% endif %} />
+                    <span class="slideshow-picker-preview">
+                      {% if item["media_kind"] == "image" %}
+                        <img src="{{ url_for('gallery.media', media_id=item['id']) }}" alt="" loading="lazy" />
+                      {% else %}
+                        <video muted playsinline preload="metadata" src="{{ url_for('gallery.media', media_id=item['id']) }}"></video>
+                      {% endif %}
+                    </span>
+                    <span class="slideshow-picker-copy">
+                      <strong>{{ item["title"] }}</strong>
+                      <small>{{ item["category_name"] }} - {{ "Video" if item["media_kind"] == "video" else "Photo" }}</small>
+                    </span>
+                  </label>
+                  <div class="slideshow-picker-fields">
+                    <label>
+                      <span>Order</span>
+                      <input class="material-field" name="slideshow_order_{{ item['id'] }}" type="number" min="1" value="{{ item['slideshow_sort_order'] if item['slideshow_sort_order'] is not none else loop.index }}" />
+                    </label>
+                    <label>
+                      <span>Caption</span>
+                      <input class="material-field" name="slideshow_caption_{{ item['id'] }}" maxlength="180" value="{{ item['slideshow_caption'] or '' }}" placeholder="{{ item['title'] }}" />
+                    </label>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+            <button class="material-button material-button-filled w-full" type="submit">
+              <span class="material-symbols-rounded text-[20px]">slideshow</span>
+              <span>Save slideshow</span>
+            </button>
+          {% else %}
+            <p class="empty-state">Upload gallery photos or videos before choosing landing page slides.</p>
+          {% endif %}
         </form>
       </section>
     {% endif %}

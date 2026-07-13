@@ -19,6 +19,12 @@
         <a class="landing-nav-link" href="#vision">Vision</a>
         <a class="landing-nav-link" href="#mission">Mission</a>
         <a class="landing-nav-link" href="#services">Services</a>
+        {% if slideshow_items %}
+          <a class="landing-nav-link" href="#slideshow">Gallery</a>
+        {% endif %}
+        {% if committees %}
+          <a class="landing-nav-link" href="#committees">Committees</a>
+        {% endif %}
         <a class="landing-nav-link" href="{{ url_for('public.visitor_feedback') }}">Visitor card</a>
         <a class="landing-nav-link" href="#contact">Contact</a>
       </nav>
@@ -122,6 +128,18 @@
         <small>Built for soul winning, soul healing, and soul keeping.</small>
       </article>
     </section>
+
+    {% with
+      slideshow_media_endpoint="public.slideshow_media",
+      slideshow_section_class="landing-slideshow-section blend-section blend-mist blend-to-white bg-[#f7f8f3]",
+      slideshow_eyebrow="Church gallery",
+      slideshow_title="Life at City Centre.",
+      slideshow_description="Selected photos and videos from services, fellowship, outreach, and special moments."
+    %}
+      <div id="slideshow">
+        {% include "partials/gallery_slideshow.html" %}
+      </div>
+    {% endwith %}
 
     <section class="blend-section blend-white blend-to-night bg-white py-16 md:py-20" id="vision">
       <div class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1180px] gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
@@ -244,6 +262,55 @@
         </div>
       </div>
     </section>
+
+    {% if committees %}
+      <section class="blend-section blend-mist blend-to-white bg-[#f7f8f3] py-16 md:py-20" id="committees">
+        <div class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1180px] gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+          <div class="section-heading sticky-block">
+            <p>Committees</p>
+            <h2>People serving the house.</h2>
+            <span>Teams helping City Centre care for worship, welcome, fellowship, and church life.</span>
+          </div>
+
+          <div class="landing-committee-stack">
+            {% for group in committees %}
+              {% set committee = group["committee"] %}
+              <section class="landing-committee-group" aria-labelledby="landing-committee-{{ committee['id'] }}">
+                <header>
+                  <span class="material-symbols-rounded">diversity_2</span>
+                  <div>
+                    <h3 id="landing-committee-{{ committee['id'] }}">{{ committee["name"] }}</h3>
+                    {% if committee["description"] %}
+                      <p>{{ committee["description"] }}</p>
+                    {% endif %}
+                  </div>
+                </header>
+
+                <div class="landing-member-grid">
+                  {% for member in group["members"] %}
+                    <article class="landing-member-card">
+                      <span class="landing-member-photo">
+                        {% if member["profile_photo"] %}
+                          <img src="{{ url_for('public.committee_photo', filename=member['profile_photo']) }}" alt="{{ member['full_name'] }}" loading="lazy" />
+                        {% else %}
+                          <span>{{ member["full_name"][:1] }}</span>
+                        {% endif %}
+                      </span>
+                      <span class="landing-member-copy">
+                        <strong>{{ member["full_name"] }}</strong>
+                        <small>{{ member["committee_title"] or "Committee member" }}</small>
+                      </span>
+                    </article>
+                  {% else %}
+                    <p class="landing-empty-note">No committee members published yet.</p>
+                  {% endfor %}
+                </div>
+              </section>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    {% endif %}
 
     <section class="blend-section blend-mist blend-to-night bg-[#f7f8f3] py-16 md:py-20">
       <div class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[1180px] gap-4 md:grid-cols-2">
