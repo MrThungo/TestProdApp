@@ -40,11 +40,124 @@
             <span>Recycle CSV</span>
           </a>
         {% endif %}
-        <button class="material-button material-button-tonal" type="button" data-print-page>
+        <button class="material-button material-button-tonal" type="button" data-print-page data-print-target="#users-directory-report">
           <span class="material-symbols-rounded text-[20px]">print</span>
           <span>Print</span>
         </button>
       </div>
+    </section>
+
+    <section id="users-directory-report" class="print-report-document screen-report-source" data-print-report>
+      <header class="print-report-header">
+        <p>Back to God Assembly of God</p>
+        <h2>User Directory Report</h2>
+        <dl>
+          <div>
+            <dt>Generated</dt>
+            <dd>{{ generated_on | pretty_date }}</dd>
+          </div>
+          <div>
+            <dt>Prepared by</dt>
+            <dd>{{ g.user["full_name"] }}</dd>
+          </div>
+          <div>
+            <dt>Scope</dt>
+            <dd>Current directory page, page {{ pagination.page }} of {{ pagination.pages }}</dd>
+          </div>
+          <div>
+            <dt>Filters</dt>
+            <dd>
+              Search: {{ search_query or "None" }};
+              Role: {{ role_labels.get(role_filter, role_filter) if role_filter else "All roles" }}
+            </dd>
+          </div>
+        </dl>
+      </header>
+
+      <section class="print-summary-grid">
+        <article>
+          <span>Total users</span>
+          <strong>{{ analytics.total }}</strong>
+        </article>
+        <article>
+          <span>Active</span>
+          <strong>{{ analytics.active }}</strong>
+        </article>
+        <article>
+          <span>Inactive</span>
+          <strong>{{ analytics.inactive }}</strong>
+        </article>
+        <article>
+          <span>Recycle bin</span>
+          <strong>{{ analytics.deleted }}</strong>
+        </article>
+        <article>
+          <span>Passwords changed</span>
+          <strong>{{ analytics.password_set }}</strong>
+        </article>
+        <article>
+          <span>Must change password</span>
+          <strong>{{ analytics.must_change }}</strong>
+        </article>
+      </section>
+
+      <section class="print-report-section">
+        <div class="print-section-heading">
+          <h3>Role Distribution</h3>
+          <p>Directory health by access role.</p>
+        </div>
+        <div class="print-chip-list">
+          {% for item in analytics.role_breakdown %}
+            <span>{{ item.label }}: <strong>{{ item.count }}</strong></span>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="print-report-section">
+        <div class="print-section-heading">
+          <h3>Directory Snapshot</h3>
+          <p>Users shown on the current filtered page.</p>
+        </div>
+        <div class="print-table-wrap">
+          <table class="print-report-table">
+            <thead>
+              <tr>
+                <th>Full name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Password</th>
+                {% if can_see_age %}<th>Age</th>{% endif %}
+                <th>Created</th>
+                <th>Last login</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for user in users %}
+                <tr>
+                  <td>{{ user["full_name"] }}</td>
+                  <td>{{ user["email"] }}</td>
+                  <td>{{ role_labels[user["role"]] }}</td>
+                  <td>{{ "Active" if user["is_active"] else "Inactive" }}</td>
+                  <td>{{ "Must change" if user["must_change_password"] else "Set" }}</td>
+                  {% if can_see_age %}<td>{{ user["date_of_birth"] | age_from_dob }}</td>{% endif %}
+                  <td>{{ user["created_at"] | pretty_date }}</td>
+                  <td>{{ user["last_login_at"] | pretty_date }}</td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="{{ 8 if can_see_age else 7 }}">No users matched this report.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="print-report-footer">
+        <span>Back to God AOG user administration</span>
+        <span>Confidential internal report</span>
+      </footer>
     </section>
 
     <form class="search-panel user-search-panel" method="get" action="{{ url_for('users.index') }}">

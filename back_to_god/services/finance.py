@@ -328,9 +328,18 @@ def list_deposit_slips(limit: int = 10, offset: int = 0) -> list[sqlite3.Row]:
 
 
 def get_deposit_slip(slip_id: int, include_deleted: bool = False) -> sqlite3.Row | None:
-    query = "SELECT * FROM deposit_slips WHERE id = ?"
+    query = """
+        SELECT
+            deposit_slips.*,
+            creator.full_name AS created_by_name,
+            approver.full_name AS approved_by_name
+        FROM deposit_slips
+        JOIN users AS creator ON creator.id = deposit_slips.created_by
+        LEFT JOIN users AS approver ON approver.id = deposit_slips.approved_by
+        WHERE deposit_slips.id = ?
+    """
     if not include_deleted:
-        query += " AND deleted_at IS NULL"
+        query += " AND deposit_slips.deleted_at IS NULL"
     return get_db().execute(query, (slip_id,)).fetchone()
 
 

@@ -10,7 +10,7 @@ from back_to_god.constants import ROLE_LABELS
 from back_to_god.core.formatting import age_from_dob
 from back_to_god.core.pagination import build_pagination, current_page
 from back_to_god.core.permissions import allowed_roles_for_current_user, can_manage_user, role_required
-from back_to_god.core.security import utc_now, validate_csrf
+from back_to_god.core.security import today_date, utc_now, validate_csrf
 from back_to_god.core.validators import is_valid_email, validate_sa_id
 from back_to_god.services.audit import log_event
 from back_to_god.services.email import send_account_created_email
@@ -190,6 +190,7 @@ def index():
         analytics=user_analytics(can_see_age),
         search_query=search_query,
         role_filter=role_filter,
+        generated_on=today_date(),
     )
 
 

@@ -16,51 +16,80 @@
           {{ slip["bank_name"] or "Bank" }} - {{ slip["deposit_date"] | pretty_date }} - {{ slip["size_bytes"] | bits_size }}
         </small>
       </span>
-      <button class="icon-action" type="button" data-print-page aria-label="Print">
+      <button class="icon-action" type="button" data-print-page data-print-target="#deposit-slip-report" aria-label="Print">
         <span class="material-symbols-rounded">print</span>
       </button>
     </section>
 
-    <section class="attachment-viewer finance-slip-viewer">
-      {% if slip["mime_type"][:6] == "image/" %}
-        <img src="{{ file_url }}" alt="{{ slip['title'] }}" />
-      {% elif slip["mime_type"] == "application/pdf" %}
-        <iframe src="{{ file_url }}" title="{{ slip['title'] }}"></iframe>
-      {% else %}
-        <span class="material-symbols-rounded text-[42px] text-btg-green">receipt_long</span>
-        <p class="text-btg-muted">Open this deposit slip from the secure file link below.</p>
-      {% endif %}
-      <a class="material-button material-button-filled w-full" href="{{ file_url }}">
-        <span class="material-symbols-rounded text-[20px]">open_in_new</span>
-        <span>Open file</span>
-      </a>
-    </section>
+    <section id="deposit-slip-report" class="slip-print-report" data-print-report>
+      <header class="print-report-header report-print-only">
+        <p>Back to God Assembly of God</p>
+        <h2>Deposit Slip Report</h2>
+        <dl>
+          <div>
+            <dt>Title</dt>
+            <dd>{{ slip["title"] }}</dd>
+          </div>
+          <div>
+            <dt>Bank</dt>
+            <dd>{{ slip["bank_name"] or "Bank" }}</dd>
+          </div>
+          <div>
+            <dt>Deposit date</dt>
+            <dd>{{ slip["deposit_date"] | pretty_date }}</dd>
+          </div>
+          <div>
+            <dt>Deposited by / uploaded by</dt>
+            <dd>{{ slip["created_by_name"] or "Unknown" }}</dd>
+          </div>
+          <div>
+            <dt>Linked offerings total</dt>
+            <dd>{{ linked_total }}</dd>
+          </div>
+        </dl>
+      </header>
 
-    <section class="material-card grid gap-4 p-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <span>
-          <p class="text-xs font-black uppercase text-btg-gold">Linked report</p>
-          <h2 class="text-2xl font-black">Offerings linked to this slip</h2>
-        </span>
-        <em class="material-chip not-italic">{{ linked_total }}</em>
-      </div>
-      <div class="grid gap-3">
-        {% for offering in linked_offerings %}
-          <article class="finance-linked-offering">
-            <span class="grid min-w-0 gap-1">
-              <strong>{{ offering["offering_type"] }} - {{ cents_to_money(offering["amount_cents"]) }}</strong>
-              <small class="text-btg-muted">{{ offering["offering_date"] | pretty_date }} by {{ offering["captured_by_name"] }}</small>
-            </span>
-            {% if offering["note"] %}
-              <p>{{ offering["note"] }}</p>
-            {% endif %}
-          </article>
+      <section class="attachment-viewer finance-slip-viewer">
+        {% if slip["mime_type"][:6] == "image/" %}
+          <img src="{{ file_url }}" alt="{{ slip['title'] }}" />
+        {% elif slip["mime_type"] == "application/pdf" %}
+          <iframe src="{{ file_url }}" title="{{ slip['title'] }}"></iframe>
         {% else %}
-          <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
-            No offering report has been linked to this slip yet.
-          </article>
-        {% endfor %}
-      </div>
+          <span class="material-symbols-rounded text-[42px] text-btg-green">receipt_long</span>
+          <p class="text-btg-muted">Open this deposit slip from the secure file link below.</p>
+        {% endif %}
+        <a class="material-button material-button-filled w-full" href="{{ file_url }}" data-print-hide>
+          <span class="material-symbols-rounded text-[20px]">open_in_new</span>
+          <span>Open file</span>
+        </a>
+      </section>
+
+      <section class="material-card grid gap-4 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <span>
+            <p class="text-xs font-black uppercase text-btg-gold">Linked report</p>
+            <h2 class="text-2xl font-black">Offerings linked to this slip</h2>
+          </span>
+          <em class="material-chip not-italic">{{ linked_total }}</em>
+        </div>
+        <div class="grid gap-3">
+          {% for offering in linked_offerings %}
+            <article class="finance-linked-offering">
+              <span class="grid min-w-0 gap-1">
+                <strong>{{ offering["offering_type"] }} - {{ cents_to_money(offering["amount_cents"]) }}</strong>
+                <small class="text-btg-muted">{{ offering["offering_date"] | pretty_date }} by {{ offering["captured_by_name"] }}</small>
+              </span>
+              {% if offering["note"] %}
+                <p>{{ offering["note"] }}</p>
+              {% endif %}
+            </article>
+          {% else %}
+            <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
+              No offering report has been linked to this slip yet.
+            </article>
+          {% endfor %}
+        </div>
+      </section>
     </section>
   </main>
   {% include "partials/bottom_nav.html" %}

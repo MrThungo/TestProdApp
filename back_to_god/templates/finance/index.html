@@ -31,7 +31,7 @@
             <span class="material-symbols-rounded text-[20px]">picture_as_pdf</span>
             <span>PDF</span>
           </a>
-          <button class="material-button material-button-ghost" type="button" data-print-page>
+          <button class="material-button material-button-ghost" type="button" data-print-page data-print-target="#finance-deposit-report">
             <span class="material-symbols-rounded text-[20px]">print</span>
             <span>Print</span>
           </button>
@@ -44,6 +44,262 @@
         </div>
       {% endif %}
     </section>
+
+    {% if can_manage_finance and summary %}
+      <section id="finance-deposit-report" class="print-report-document screen-report-source" data-print-report>
+        <header class="print-report-header">
+          <p>Back to God Assembly of God</p>
+          <h2>Finance Deposit Report</h2>
+          <dl>
+            <div>
+              <dt>Generated</dt>
+              <dd>{{ today | pretty_date }}</dd>
+            </div>
+            <div>
+              <dt>Prepared by</dt>
+              <dd>{{ g.user["full_name"] }}</dd>
+            </div>
+            <div>
+              <dt>Scope</dt>
+              <dd>Detailed deposit accountability, offering linkage, approval, visibility, and file audit.</dd>
+            </div>
+            <div>
+              <dt>Report records</dt>
+              <dd>{{ report_slips | length }} deposit slips and {{ report_offerings | length }} offering entries</dd>
+            </div>
+          </dl>
+        </header>
+
+        <section class="print-summary-grid">
+          <article>
+            <span>Total slips</span>
+            <strong>{{ summary.slip_count }}</strong>
+          </article>
+          <article>
+            <span>Total captured</span>
+            <strong>{{ summary.total_money }}</strong>
+          </article>
+          <article>
+            <span>Offerings captured</span>
+            <strong>{{ summary.offering_money }}</strong>
+          </article>
+          <article>
+            <span>Offering records</span>
+            <strong>{{ summary.offering_count }}</strong>
+          </article>
+          <article>
+            <span>Visible now</span>
+            <strong>{{ summary.visible_count }}</strong>
+          </article>
+          <article>
+            <span>Pending approval</span>
+            <strong>{{ summary.pending_count }}</strong>
+          </article>
+          <article>
+            <span>Expired windows</span>
+            <strong>{{ summary.expired_count }}</strong>
+          </article>
+        </section>
+
+        <section class="print-report-section">
+          <div class="print-section-heading">
+            <h3>Monthly Deposits</h3>
+            <p>Captured deposit values by month.</p>
+          </div>
+          <div class="print-table-wrap">
+            <table class="print-report-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for month in summary.monthly %}
+                  <tr>
+                    <td>{{ month["month"] }}</td>
+                    <td>{{ cents_to_money(month["cents"]) }}</td>
+                  </tr>
+                {% else %}
+                  <tr>
+                    <td colspan="2">No deposit data yet.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="print-report-columns">
+          <article class="print-report-section">
+            <div class="print-section-heading">
+              <h3>Status Summary</h3>
+              <p>Approval and visibility state.</p>
+            </div>
+            <div class="print-chip-list">
+              {% for item in summary.status_breakdown %}
+                <span>{{ item.label }}: <strong>{{ item.count }}</strong></span>
+              {% endfor %}
+            </div>
+          </article>
+          <article class="print-report-section">
+            <div class="print-section-heading">
+              <h3>Offering Types</h3>
+              <p>Captured giving categories.</p>
+            </div>
+            <div class="print-chip-list">
+              {% for item in summary.offering_types %}
+                <span>{{ item.label }}: <strong>{{ cents_to_money(item["cents"]) }}</strong></span>
+              {% else %}
+                <span>No offering data yet.</span>
+              {% endfor %}
+            </div>
+          </article>
+        </section>
+
+        <section class="print-report-section">
+          <div class="print-section-heading">
+            <h3>Offering Register</h3>
+            <p>Captured offering records and linked deposit slip references.</p>
+          </div>
+          <div class="print-table-wrap">
+            <table class="print-report-table finance-report-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Offering type</th>
+                  <th>Amount</th>
+                  <th>Captured by</th>
+                  <th>Linked slip</th>
+                  <th>Slip reference</th>
+                  <th>Note</th>
+                  <th>Captured at</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for offering in report_offerings %}
+                  <tr>
+                    <td>{{ offering["offering_date"] | pretty_date }}</td>
+                    <td>{{ offering["offering_type"] }}</td>
+                    <td>{{ cents_to_money(offering["amount_cents"]) }}</td>
+                    <td>{{ offering["captured_by_name"] }}</td>
+                    <td>{{ offering["deposit_slip_title"] or "Not linked" }}</td>
+                    <td>{{ offering["deposit_reference"] or "Not linked" }}</td>
+                    <td>{{ offering["note"] or "None" }}</td>
+                    <td>{{ offering["created_at"] | chat_timestamp }}</td>
+                  </tr>
+                {% else %}
+                  <tr>
+                    <td colspan="8">No offerings have been captured yet.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="print-report-section">
+          <div class="print-section-heading">
+            <h3>Deposit Accountability Register</h3>
+            <p>Every deposit slip with the person who deposited/uploaded the money.</p>
+          </div>
+          <div class="print-table-wrap">
+            <table class="print-report-table finance-report-table">
+              <thead>
+                <tr>
+                  <th>Deposit date</th>
+                  <th>Slip title</th>
+                  <th>Bank</th>
+                  <th>Reference</th>
+                  <th>Amount</th>
+                  <th>Deposited by / uploaded by</th>
+                  <th>Uploaded at</th>
+                  <th>Status</th>
+                  <th>Visibility</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for slip in report_slips %}
+                  <tr>
+                    <td>{{ slip["deposit_date"] | pretty_date }}</td>
+                    <td>{{ slip["title"] }}</td>
+                    <td>{{ slip["bank_name"] or "Bank" }}</td>
+                    <td>{{ slip["reference"] or "Not added" }}</td>
+                    <td>{{ cents_to_money(slip["amount_cents"]) }}</td>
+                    <td>{{ slip["created_by_name"] or "Unknown" }}</td>
+                    <td>{{ slip["created_at"] | chat_timestamp }}</td>
+                    <td>{{ slip["approval_status"] }}</td>
+                    <td>
+                      {% if slip["is_visible"] and slip["visible_until"] %}
+                        Visible until {{ slip["visible_until"] | chat_timestamp }}
+                      {% elif slip["approval_status"] == "approved" and slip["visible_until"] %}
+                        Expired or revoked
+                      {% else %}
+                        Not visible
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr>
+                    <td colspan="9">No deposit slips are available for this report.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="print-report-section">
+          <div class="print-section-heading">
+            <h3>Approval, Visibility & File Audit</h3>
+            <p>Controls and file evidence attached to each deposit slip.</p>
+          </div>
+          <div class="print-table-wrap">
+            <table class="print-report-table finance-report-table">
+              <thead>
+                <tr>
+                  <th>Slip title</th>
+                  <th>Visible now</th>
+                  <th>Visible from</th>
+                  <th>Visible until</th>
+                  <th>Approved / revoked by</th>
+                  <th>Approved / revoked at</th>
+                  <th>File name</th>
+                  <th>File type</th>
+                  <th>File size</th>
+                  <th>Updated at</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for slip in report_slips %}
+                  <tr>
+                    <td>{{ slip["title"] }}</td>
+                    <td>{{ "Yes" if slip["is_visible"] else "No" }}</td>
+                    <td>{{ slip["visible_from"] | chat_timestamp if slip["visible_from"] else "Not visible" }}</td>
+                    <td>{{ slip["visible_until"] | chat_timestamp if slip["visible_until"] else "Not set" }}</td>
+                    <td>{{ slip["approved_by_name"] or "Not approved" }}</td>
+                    <td>{{ slip["approved_at"] | chat_timestamp if slip["approved_at"] else "Not approved" }}</td>
+                    <td>{{ slip["original_name"] or "Unknown file" }}</td>
+                    <td>{{ slip["mime_type"] or "Unknown" }}</td>
+                    <td>{{ slip["size_bytes"] | bits_size }}</td>
+                    <td>{{ slip["updated_at"] | chat_timestamp }}</td>
+                  </tr>
+                {% else %}
+                  <tr>
+                    <td colspan="10">No audit records are available for this report.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <footer class="print-report-footer">
+          <span>Back to God AOG finance administration</span>
+          <span>Confidential internal report</span>
+        </footer>
+      </section>
+    {% endif %}
 
     {% if can_manage_finance and summary %}
       <section class="dashboard-grid">

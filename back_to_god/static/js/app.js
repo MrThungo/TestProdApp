@@ -20,8 +20,44 @@ document.querySelectorAll("[data-copy]").forEach((button) => {
   });
 });
 
+let activePrintShell = null;
+
+function cleanReportPrintShell() {
+  document.body.classList.remove("is-printing-report");
+  activePrintShell?.remove();
+  activePrintShell = null;
+}
+
+window.addEventListener("afterprint", cleanReportPrintShell);
+
 document.querySelectorAll("[data-print-page]").forEach((button) => {
-  button.addEventListener("click", () => window.print());
+  button.addEventListener("click", () => {
+    const targetSelector = button.dataset.printTarget;
+    const report =
+      (targetSelector ? document.querySelector(targetSelector) : null) ||
+      button.closest("[data-print-report]") ||
+      document.querySelector("[data-print-report]");
+
+    if (!report) {
+      window.print();
+      return;
+    }
+
+    cleanReportPrintShell();
+    activePrintShell = document.createElement("main");
+    activePrintShell.className = "print-report-shell";
+
+    const reportClone = report.cloneNode(true);
+    reportClone.classList.remove("screen-report-source");
+    reportClone.querySelectorAll("[data-print-hide], .no-print").forEach((node) => node.remove());
+
+    activePrintShell.appendChild(reportClone);
+    document.body.appendChild(activePrintShell);
+    document.body.classList.add("is-printing-report");
+
+    window.print();
+    window.setTimeout(cleanReportPrintShell, 800);
+  });
 });
 
 document.querySelectorAll("[data-safe-back]").forEach((button) => {
