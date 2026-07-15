@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from flask import (
     Blueprint,
-    Response,
     abort,
     current_app,
     flash,
@@ -11,12 +10,12 @@ from flask import (
     render_template,
     request,
     send_from_directory,
-    stream_with_context,
     url_for,
 )
 from werkzeug.utils import secure_filename
 
 from back_to_god.core.db import get_db
+from back_to_god.core.media import inline_disposition, media_response
 from back_to_god.core.security import today_date, validate_csrf
 from back_to_god.services.audit import log_event
 from back_to_god.services.committees import list_committees
@@ -53,23 +52,15 @@ def slideshow_media(media_id: int):
         abort(404)
 
     etag = f"slideshow-{item['id']}-{item['updated_at']}-{item['size_bytes']}"
-    headers = {
-        "Cache-Control": "public, max-age=86400",
-        "Content-Length": str(item["size_bytes"]),
-        "Content-Disposition": f"inline; filename=\"{item['original_name'] or 'slideshow-media'}\"",
-    }
-    if request.if_none_match.contains(etag):
-        response = Response(status=304, headers={"Cache-Control": headers["Cache-Control"]})
-        response.set_etag(etag)
-        return response
-
-    response = Response(
-        stream_with_context(gallery_media_bytes(media_id)),
-        mimetype=item["mime_type"],
-        headers=headers,
+    return media_response(
+        stream_factory=lambda: gallery_media_bytes(media_id),
+        range_factory=lambda start, length: gallery_media_bytes(media_id, start, length),
+        mime_type=item["mime_type"],
+        size_bytes=int(item["size_bytes"]),
+        cache_control="public, max-age=86400",
+        content_disposition=inline_disposition(item["original_name"], "slideshow-media"),
+        etag=etag,
     )
-    response.set_etag(etag)
-    return response
 
 
 @bp.get("/committee-photo/<path:filename>")
@@ -116,3 +107,13 @@ def visitor_feedback():
 @bp.get("/healthz")
 def healthz():
     return jsonify(status="ok")
+
+
+@bp.get("/readyz")
+def readyz():
+    try:
+        get_db().execute("SELECT 1").fetchone()
+    except Exception:
+        current_app.logger.exception("Readiness check failed")
+        return jsonify(status="error", database="unavailable"), 503
+    return jsonify(status="ok", database="ok")

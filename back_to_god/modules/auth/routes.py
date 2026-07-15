@@ -18,6 +18,7 @@ from werkzeug.security import check_password_hash
 
 from back_to_god.constants import ROLE_ICONS, ROLE_LABELS
 from back_to_god.core.permissions import login_required
+from back_to_god.core.rate_limit import clear_attempts, is_limited, record_attempt
 from back_to_god.core.security import validate_csrf
 from back_to_god.core.validators import is_valid_email, validate_password_strength, validate_sa_id
 from back_to_god.services.audit import log_event
@@ -44,6 +45,25 @@ from back_to_god.services.users import (
 
 bp = Blueprint("auth", __name__)
 
+LOGIN_LIMIT = 8
+LOGIN_WINDOW_SECONDS = 15 * 60
+RESET_LIMIT = 5
+RESET_WINDOW_SECONDS = 15 * 60
+QUICK_LOGIN_LIMIT = 20
+QUICK_LOGIN_WINDOW_SECONDS = 60
+
+
+def _limited_message(retry_after: int) -> str:
+    minutes = max(1, (retry_after + 59) // 60)
+    return f"Too many attempts. Please try again in about {minutes} minute{'s' if minutes != 1 else ''}."
+
+
+def _flash_if_limited(scope: str, key: str, *, limit: int, window_seconds: int) -> bool:
+    limited, retry_after = is_limited(scope, key, limit=limit, window_seconds=window_seconds)
+    if limited:
+        flash(_limited_message(retry_after), "error")
+    return limited
+
 
 @bp.route("/login", methods=("GET", "POST"))
 def login():
@@ -55,19 +75,23 @@ def login():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         remember_me = request.form.get("remember_me") == "on"
-        user = get_user_by_email(email, include_deleted=True)
+        if not _flash_if_limited("login", email or "blank", limit=LOGIN_LIMIT, window_seconds=LOGIN_WINDOW_SECONDS):
+            user = get_user_by_email(email, include_deleted=True)
 
-        if user is None or not check_password_hash(user["password_hash"], password):
-            flash("The email or password is not correct.", "error")
-        elif not user["is_active"] or user["deleted_at"]:
-            flash("This account is inactive.", "error")
-        else:
-            session.clear()
-            session.permanent = remember_me
-            session["user_id"] = user["id"]
-            record_login(user["id"])
-            log_event("login", user["id"], "user", user["id"], "Signed in")
-            return redirect(url_for("dashboard.index"))
+            if user is None or not check_password_hash(user["password_hash"], password):
+                record_attempt("login", email or "blank", window_seconds=LOGIN_WINDOW_SECONDS)
+                flash("The email or password is not correct.", "error")
+            elif not user["is_active"] or user["deleted_at"]:
+                record_attempt("login", email or "blank", window_seconds=LOGIN_WINDOW_SECONDS)
+                flash("This account is inactive.", "error")
+            else:
+                clear_attempts("login", email or "blank")
+                session.clear()
+                session.permanent = remember_me
+                session["user_id"] = user["id"]
+                record_login(user["id"])
+                log_event("login", user["id"], "user", user["id"], "Signed in")
+                return redirect(url_for("dashboard.index"))
 
     quick_roles = [role for role in QUICK_LOGIN_USERS if role in ROLE_LABELS]
     return render_template(
@@ -148,6 +172,9 @@ def forgot_password():
     if request.method == "POST":
         validate_csrf()
         email = request.form.get("email", "").strip().lower()
+        if _flash_if_limited("forgot-password", email or "blank", limit=RESET_LIMIT, window_seconds=RESET_WINDOW_SECONDS):
+            return render_template("auth/forgot_password.html")
+        record_attempt("forgot-password", email or "blank", window_seconds=RESET_WINDOW_SECONDS)
         user = get_user_by_email(email)
         if user is not None and user["is_active"]:
             token = create_password_reset_token(user["id"])
@@ -177,6 +204,9 @@ def reset_password_token(token: str):
 
     if request.method == "POST":
         validate_csrf()
+        if _flash_if_limited("reset-password", token[:32], limit=RESET_LIMIT, window_seconds=RESET_WINDOW_SECONDS):
+            return render_template("auth/reset_password.html", token=token, reset=reset)
+        record_attempt("reset-password", token[:32], window_seconds=RESET_WINDOW_SECONDS)
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
         if password != confirm_password:
@@ -193,6 +223,7 @@ def reset_password_token(token: str):
                     return redirect(url_for("auth.forgot_password"))
                 send_password_changed_email(reset["email"], reset["full_name"])
                 log_event("password_reset_by_link", reset["user_id"], "user", reset["user_id"], "Forgot password")
+                clear_attempts("reset-password", token[:32])
                 flash("Password changed. You can sign in now.", "success")
                 return redirect(url_for("auth.login"))
 
@@ -204,6 +235,10 @@ def reset_password_token(token: str):
 def change_password():
     if request.method == "POST":
         validate_csrf()
+        password_key = str(g.user["id"])
+        if _flash_if_limited("change-password", password_key, limit=RESET_LIMIT, window_seconds=RESET_WINDOW_SECONDS):
+            return render_template("auth/change_password.html")
+        record_attempt("change-password", password_key, window_seconds=RESET_WINDOW_SECONDS)
         current_password = request.form.get("current_password", "")
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
@@ -223,6 +258,7 @@ def change_password():
                 update_user_password(g.user["id"], password)
                 send_password_changed_email(g.user["email"], g.user["full_name"])
                 log_event("password_changed", g.user["id"], "user", g.user["id"], "First login complete")
+                clear_attempts("change-password", password_key)
                 flash("Password changed. You can now use the app.", "success")
                 return redirect(url_for("dashboard.index"))
 
@@ -237,6 +273,9 @@ def quick_login(role: str):
         abort(404)
 
     validate_csrf()
+    if _flash_if_limited("quick-login", role, limit=QUICK_LOGIN_LIMIT, window_seconds=QUICK_LOGIN_WINDOW_SECONDS):
+        return redirect(url_for("auth.login"))
+    record_attempt("quick-login", role, window_seconds=QUICK_LOGIN_WINDOW_SECONDS)
     user = get_or_create_quick_user(role)
     if not user["is_active"] or user["deleted_at"]:
         flash("This account is inactive.", "error")

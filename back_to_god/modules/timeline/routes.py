@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
-from flask import Blueprint, Response, abort, flash, g, jsonify, redirect, render_template, request, stream_with_context, url_for
+from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 
 from back_to_god.core.db import get_db
+from back_to_god.core.media import inline_disposition, media_response
 from back_to_god.core.pagination import build_pagination, current_page
 from back_to_god.core.permissions import login_required
 from back_to_god.core.security import validate_csrf
@@ -142,15 +143,15 @@ def media(media_id: int):
     item = get_media(media_id, g.user["id"], g.user["role"])
     if item is None:
         abort(404)
-    headers = {
-        "Cache-Control": "private, max-age=86400",
-        "Content-Length": str(item["size_bytes"]),
-        "Content-Disposition": f"inline; filename=\"{item['original_name'] or 'timeline-media'}\"",
-    }
-    return Response(
-        stream_with_context(media_bytes(media_id)),
-        mimetype=item["mime_type"],
-        headers=headers,
+    etag = f"timeline-{item['id']}-{item['created_at']}-{item['size_bytes']}"
+    return media_response(
+        stream_factory=lambda: media_bytes(media_id),
+        range_factory=lambda start, length: media_bytes(media_id, start, length),
+        mime_type=item["mime_type"],
+        size_bytes=int(item["size_bytes"]),
+        cache_control="private, max-age=86400",
+        content_disposition=inline_disposition(item["original_name"], "timeline-media"),
+        etag=etag,
     )
 
 

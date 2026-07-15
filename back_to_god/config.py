@@ -56,6 +56,9 @@ class Config:
     SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "") == "1"
     SMTP_FALLBACK_PORTS = os.environ.get("SMTP_FALLBACK_PORTS", "587,465")
     ENABLE_QUICK_LOGIN = os.environ.get("ENABLE_QUICK_LOGIN", "1") == "1"
+    ENABLE_GZIP = os.environ.get("ENABLE_GZIP", "1") == "1"
+    GZIP_MIN_BYTES = int(os.environ.get("GZIP_MIN_BYTES", "1024"))
+    GZIP_COMPRESS_LEVEL = int(os.environ.get("GZIP_COMPRESS_LEVEL", "5"))
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"

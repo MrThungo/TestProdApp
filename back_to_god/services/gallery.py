@@ -419,13 +419,23 @@ def get_gallery_media(media_id: int) -> sqlite3.Row | None:
     ).fetchone()
 
 
-def gallery_media_bytes(media_id: int):
+def gallery_media_bytes(media_id: int, start: int = 0, length: int | None = None):
     connection = connect_database()
     try:
-        row = connection.execute(
-            "SELECT data FROM gallery_media WHERE id = ? AND deleted_at IS NULL",
-            (media_id,),
-        ).fetchone()
+        if length is None:
+            row = connection.execute(
+                "SELECT data FROM gallery_media WHERE id = ? AND deleted_at IS NULL",
+                (media_id,),
+            ).fetchone()
+        else:
+            row = connection.execute(
+                """
+                SELECT substr(data, ?, ?) AS data
+                FROM gallery_media
+                WHERE id = ? AND deleted_at IS NULL
+                """,
+                (start + 1, length, media_id),
+            ).fetchone()
         if row:
             yield row[0]
     finally:

@@ -306,6 +306,7 @@ def get_recording_meta(live_id: int) -> sqlite3.Row | None:
             live_recordings.mime_type,
             1 AS recording_count,
             live_recordings.size_bytes AS total_bytes,
+            live_recordings.updated_at,
             1 AS is_finalized
         FROM live_recordings
         JOIN live_sessions ON live_sessions.id = live_recordings.live_session_id
@@ -318,20 +319,33 @@ def get_recording_meta(live_id: int) -> sqlite3.Row | None:
     return finalized
 
 
-def recording_bytes(live_id: int):
+def recording_bytes(live_id: int, start: int = 0, length: int | None = None):
     connection = connect_database()
     try:
-        finalized = connection.execute(
-            """
-            SELECT live_recordings.data
-            FROM live_recordings
-            JOIN live_sessions ON live_sessions.id = live_recordings.live_session_id
-            WHERE live_recordings.live_session_id = ?
-              AND live_recordings.deleted_at IS NULL
-              AND live_sessions.recording_deleted_at IS NULL
-            """,
-            (live_id,),
-        ).fetchone()
+        if length is None:
+            finalized = connection.execute(
+                """
+                SELECT live_recordings.data
+                FROM live_recordings
+                JOIN live_sessions ON live_sessions.id = live_recordings.live_session_id
+                WHERE live_recordings.live_session_id = ?
+                  AND live_recordings.deleted_at IS NULL
+                  AND live_sessions.recording_deleted_at IS NULL
+                """,
+                (live_id,),
+            ).fetchone()
+        else:
+            finalized = connection.execute(
+                """
+                SELECT substr(live_recordings.data, ?, ?) AS data
+                FROM live_recordings
+                JOIN live_sessions ON live_sessions.id = live_recordings.live_session_id
+                WHERE live_recordings.live_session_id = ?
+                  AND live_recordings.deleted_at IS NULL
+                  AND live_sessions.recording_deleted_at IS NULL
+                """,
+                (start + 1, length, live_id),
+            ).fetchone()
         if finalized is not None:
             yield finalized[0]
     finally:

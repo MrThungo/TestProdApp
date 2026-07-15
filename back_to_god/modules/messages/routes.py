@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from flask import Blueprint, Response, abort, g, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, g, jsonify, redirect, render_template, request, url_for
 
+from back_to_god.core.media import inline_disposition, media_response
 from back_to_god.core.permissions import login_required
 from back_to_god.core.security import validate_csrf
 from back_to_god.services.messages import (
+    attachment_bytes,
     delete_attachment_for_user,
     delete_message,
     edit_message,
@@ -195,19 +197,15 @@ def attachment(attachment_id: int):
     if item is None:
         abort(404)
     etag = f"attachment-{item['id']}-{item['size_bytes']}"
-    headers = {
-        "Cache-Control": "private, max-age=86400",
-        "Content-Length": str(item["size_bytes"]),
-        "Content-Disposition": f"inline; filename=\"{item['original_name'] or 'message-media'}\"",
-    }
-    if request.if_none_match.contains(etag):
-        response = Response(status=304, headers={"Cache-Control": headers["Cache-Control"]})
-        response.set_etag(etag)
-        return response
-
-    response = Response(item["data"], mimetype=item["mime_type"], headers=headers)
-    response.set_etag(etag)
-    return response
+    return media_response(
+        stream_factory=lambda: attachment_bytes(attachment_id, g.user["id"]),
+        range_factory=lambda start, length: attachment_bytes(attachment_id, g.user["id"], start, length),
+        mime_type=item["mime_type"],
+        size_bytes=int(item["size_bytes"]),
+        cache_control="private, max-age=86400",
+        content_disposition=inline_disposition(item["original_name"], "message-media"),
+        etag=etag,
+    )
 
 
 @bp.get("/attachment/<int:attachment_id>/view")

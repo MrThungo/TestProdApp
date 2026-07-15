@@ -4,7 +4,6 @@ import json
 
 from flask import (
     Blueprint,
-    Response,
     abort,
     flash,
     g,
@@ -12,11 +11,11 @@ from flask import (
     redirect,
     render_template,
     request,
-    stream_with_context,
     url_for,
 )
 
 from back_to_god.constants import CAN_GO_LIVE_ROLES
+from back_to_god.core.media import inline_disposition, media_response
 from back_to_god.core.pagination import build_pagination, current_page
 from back_to_god.core.permissions import can_go_live, login_required
 from back_to_god.core.security import validate_csrf
@@ -204,15 +203,15 @@ def recording(live_id: int):
     if meta is None or not meta["recording_count"]:
         abort(404)
 
-    headers = {
-        "Cache-Control": "private, max-age=86400",
-        "Content-Length": str(meta["total_bytes"]),
-        "Content-Disposition": f"inline; filename=\"back-to-god-live-{live_id}.webm\"",
-    }
-    return Response(
-        stream_with_context(recording_bytes(live_id)),
-        mimetype=meta["mime_type"] or "video/webm",
-        headers=headers,
+    etag = f"live-recording-{live_id}-{meta['updated_at']}-{meta['total_bytes']}"
+    return media_response(
+        stream_factory=lambda: recording_bytes(live_id),
+        range_factory=lambda start, length: recording_bytes(live_id, start, length),
+        mime_type=meta["mime_type"] or "video/webm",
+        size_bytes=int(meta["total_bytes"]),
+        cache_control="private, max-age=86400",
+        content_disposition=inline_disposition(f"back-to-god-live-{live_id}.webm", "live-recording.webm"),
+        etag=etag,
     )
 
 

@@ -279,7 +279,15 @@ def get_attachment_for_user(attachment_id: int, user_id: int) -> sqlite3.Row | N
     return get_db().execute(
         """
         SELECT
-            message_attachments.*,
+            message_attachments.id,
+            message_attachments.message_id,
+            message_attachments.media_kind,
+            message_attachments.mime_type,
+            message_attachments.original_name,
+            message_attachments.size_bytes,
+            message_attachments.created_at,
+            message_attachments.deleted_at,
+            message_attachments.deleted_by,
             messages.sender_id,
             messages.recipient_id
         FROM message_attachments
@@ -290,6 +298,35 @@ def get_attachment_for_user(attachment_id: int, user_id: int) -> sqlite3.Row | N
         """,
         (attachment_id, user_id, user_id),
     ).fetchone()
+
+
+def attachment_bytes(attachment_id: int, user_id: int, start: int = 0, length: int | None = None):
+    if length is None:
+        row = get_db().execute(
+            """
+            SELECT message_attachments.data
+            FROM message_attachments
+            JOIN messages ON messages.id = message_attachments.message_id
+            WHERE message_attachments.id = ?
+              AND (messages.sender_id = ? OR messages.recipient_id = ?)
+              AND message_attachments.deleted_at IS NULL
+            """,
+            (attachment_id, user_id, user_id),
+        ).fetchone()
+    else:
+        row = get_db().execute(
+            """
+            SELECT substr(message_attachments.data, ?, ?) AS data
+            FROM message_attachments
+            JOIN messages ON messages.id = message_attachments.message_id
+            WHERE message_attachments.id = ?
+              AND (messages.sender_id = ? OR messages.recipient_id = ?)
+              AND message_attachments.deleted_at IS NULL
+            """,
+            (start + 1, length, attachment_id, user_id, user_id),
+        ).fetchone()
+    if row:
+        yield row["data"]
 
 
 def get_message_for_user(message_id: int, user_id: int) -> sqlite3.Row | None:

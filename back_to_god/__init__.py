@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import gzip
 import time
+import uuid
 
 from flask import Flask, current_app, g, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import HTTPException
@@ -35,6 +37,59 @@ HIGH_FREQUENCY_ENDPOINTS = {
     "profile.photo",
     "timeline.poll",
 }
+COMPRESSIBLE_MIMETYPES = {
+    "application/javascript",
+    "application/json",
+    "image/svg+xml",
+    "text/css",
+    "text/html",
+    "text/javascript",
+    "text/plain",
+}
+
+
+def _vary_header(response, value: str) -> None:
+    existing = response.headers.get("Vary", "")
+    values = {item.strip() for item in existing.split(",") if item.strip()}
+    if value not in values:
+        values.add(value)
+        response.headers["Vary"] = ", ".join(sorted(values))
+
+
+def _gzip_response(response):
+    if not current_app.config.get("ENABLE_GZIP", True):
+        return response
+    if request.method == "HEAD":
+        return response
+    if "gzip" not in (request.headers.get("Accept-Encoding") or "").lower():
+        return response
+    if response.status_code < 200 or response.status_code in {204, 206, 304}:
+        return response
+    if response.is_streamed or response.direct_passthrough or response.headers.get("Content-Encoding"):
+        return response
+    if (response.mimetype or "").lower() not in COMPRESSIBLE_MIMETYPES:
+        return response
+
+    data = response.get_data()
+    min_bytes = int(current_app.config.get("GZIP_MIN_BYTES", 1024))
+    if len(data) < min_bytes:
+        return response
+
+    compress_level = max(1, min(9, int(current_app.config.get("GZIP_COMPRESS_LEVEL", 5))))
+    compressed = gzip.compress(data, compresslevel=compress_level)
+    if len(compressed) >= len(data):
+        return response
+
+    response.set_data(compressed)
+    response.headers["Content-Encoding"] = "gzip"
+    response.headers["Content-Length"] = str(len(compressed))
+    _vary_header(response, "Accept-Encoding")
+    return response
+
+
+def _finalize_response(response):
+    response.headers.setdefault("X-Request-ID", getattr(g, "request_id", ""))
+    return _gzip_response(response)
 
 
 def create_app(config: type[Config] = Config) -> Flask:
@@ -128,6 +183,12 @@ def register_error_handlers(app: Flask) -> None:
 def register_request_hooks(app: Flask) -> None:
     @app.before_request
     def load_current_user():
+        submitted_request_id = (request.headers.get("X-Request-ID") or "").strip()
+        safe_request_id = "".join(
+            character for character in submitted_request_id if character.isalnum() or character in "-_.:"
+        )
+        g.request_id = safe_request_id[:80] if safe_request_id else uuid.uuid4().hex
+
         if (
             request.method in {"POST", "PUT", "PATCH", "DELETE"}
             and request.endpoint != "api.send_external_notification"
@@ -235,9 +296,9 @@ def register_request_hooks(app: Flask) -> None:
             "form-action 'self'",
         )
         if getattr(g, "user", None) is None:
-            return response
+            return _finalize_response(response)
         if response.status_code >= 500:
-            return response
+            return _finalize_response(response)
         skipped = {
             "static",
             "messages.poll",
@@ -263,7 +324,7 @@ def register_request_hooks(app: Flask) -> None:
                 None,
                 f"{request.method} {request.path} {response.status_code}",
             )
-        return response
+        return _finalize_response(response)
 
 
 def register_blueprints(app: Flask) -> None:

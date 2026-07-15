@@ -660,13 +660,19 @@ def get_media(media_id: int, user_id: int, role: str) -> sqlite3.Row | None:
     ).fetchone()
 
 
-def media_bytes(media_id: int):
+def media_bytes(media_id: int, start: int = 0, length: int | None = None):
     connection = connect_database()
     try:
-        row = connection.execute(
-            "SELECT data FROM timeline_media WHERE id = ?",
-            (media_id,),
-        ).fetchone()
+        if length is None:
+            row = connection.execute(
+                "SELECT data FROM timeline_media WHERE id = ?",
+                (media_id,),
+            ).fetchone()
+        else:
+            row = connection.execute(
+                "SELECT substr(data, ?, ?) AS data FROM timeline_media WHERE id = ?",
+                (start + 1, length, media_id),
+            ).fetchone()
         if row:
             yield row[0]
     finally:

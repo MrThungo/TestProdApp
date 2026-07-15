@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from flask import Blueprint, Response, abort, flash, g, jsonify, redirect, render_template, request, stream_with_context, url_for
+from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 
+from back_to_god.core.media import inline_disposition, media_response
 from back_to_god.core.pagination import build_pagination, current_page
 from back_to_god.core.permissions import login_required
 from back_to_god.core.security import validate_csrf
@@ -185,23 +186,15 @@ def media(media_id: int):
     if item is None:
         abort(404)
     etag = _media_etag("gallery", item)
-    headers = {
-        "Cache-Control": "private, max-age=86400",
-        "Content-Length": str(item["size_bytes"]),
-        "Content-Disposition": f"inline; filename=\"{item['original_name'] or 'gallery-media'}\"",
-    }
-    if request.if_none_match.contains(etag):
-        response = Response(status=304, headers={"Cache-Control": headers["Cache-Control"]})
-        response.set_etag(etag)
-        return response
-
-    response = Response(
-        stream_with_context(gallery_media_bytes(media_id)),
-        mimetype=item["mime_type"],
-        headers=headers,
+    return media_response(
+        stream_factory=lambda: gallery_media_bytes(media_id),
+        range_factory=lambda start, length: gallery_media_bytes(media_id, start, length),
+        mime_type=item["mime_type"],
+        size_bytes=int(item["size_bytes"]),
+        cache_control="private, max-age=86400",
+        content_disposition=inline_disposition(item["original_name"], "gallery-media"),
+        etag=etag,
     )
-    response.set_etag(etag)
-    return response
 
 
 @bp.get("/media/<int:media_id>/view")
