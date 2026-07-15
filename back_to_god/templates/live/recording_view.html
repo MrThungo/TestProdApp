@@ -20,6 +20,10 @@
         <span class="material-symbols-rounded text-[20px]">arrow_back</span>
         <span>Back</span>
       </a>
+      <a class="material-button material-button-filled media-viewer-back-button" href="{{ url_for('live.recording_download', live_id=live['id']) }}">
+        <span class="material-symbols-rounded text-[20px]">download</span>
+        <span>Download</span>
+      </a>
     </section>
 
     <section class="media-viewer-frame">
@@ -36,6 +40,10 @@
       <small class="text-btg-muted">
         Recorded by {{ live["streamer_name"] }}. Stored as one compressed database video: {{ meta["total_bytes"] | bits_size }}.
       </small>
+      <a class="material-button material-button-filled" href="{{ url_for('live.recording_download', live_id=live['id']) }}">
+        <span class="material-symbols-rounded text-[20px]">download</span>
+        <span>Download video</span>
+      </a>
       {% if can_manage_session %}
         <form method="post" action="{{ url_for('live.delete_recording', live_id=live['id']) }}">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}" />

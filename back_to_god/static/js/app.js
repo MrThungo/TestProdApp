@@ -1627,8 +1627,21 @@ async function postLiveSignal(url, data) {
   return response.ok ? response.json() : null;
 }
 
-function createPeerConnection(onIceCandidate, onTrack) {
-  const connection = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+function getLiveIceServers(host) {
+  try {
+    const servers = JSON.parse(host?.dataset.iceServers || "[]");
+    return Array.isArray(servers) && servers.length ? servers : [{ urls: ["stun:stun.l.google.com:19302"] }];
+  } catch {
+    return [{ urls: ["stun:stun.l.google.com:19302"] }];
+  }
+}
+
+function createPeerConnection(onIceCandidate, onTrack, iceServers = [{ urls: ["stun:stun.l.google.com:19302"] }]) {
+  const connection = new RTCPeerConnection({
+    iceServers,
+    bundlePolicy: "max-bundle",
+    iceCandidatePoolSize: 2,
+  });
   connection.onicecandidate = (event) => {
     if (event.candidate) onIceCandidate(event.candidate);
   };
@@ -1636,6 +1649,23 @@ function createPeerConnection(onIceCandidate, onTrack) {
     connection.ontrack = onTrack;
   }
   return connection;
+}
+
+function updateLiveHealth(host, label, state = "pending") {
+  host?.querySelectorAll("[data-live-health-label]").forEach((item) => {
+    item.textContent = label;
+  });
+  const dot = host?.querySelector("[data-live-health-dot]");
+  if (dot) {
+    dot.classList.remove("pending", "connected", "failed", "ended");
+    dot.classList.add(state);
+  }
+}
+
+function updateLiveViewerCount(host, count) {
+  host?.querySelectorAll("[data-live-viewer-count]").forEach((item) => {
+    item.textContent = Number(count || 0).toLocaleString();
+  });
 }
 
 const liveStudio = document.querySelector("[data-live-studio]");
@@ -1646,6 +1676,7 @@ if (liveStudio) {
   const startButton = liveStudio.querySelector("[data-live-start-camera]");
   const recordingStatus = liveStudio.querySelector("[data-live-recording-status]");
   const endForm = liveStudio.querySelector("[data-live-end-form]");
+  const iceServers = getLiveIceServers(liveStudio);
   const peers = new Map();
   let localStream = null;
   let lastSignalId = 0;
@@ -1657,6 +1688,30 @@ if (liveStudio) {
 
   function setLiveStudioStatus(message) {
     if (recordingStatus) recordingStatus.textContent = message;
+  }
+
+  function connectedPeerCount() {
+    return [...peers.values()].filter((peer) => {
+      return ["connected", "completed"].includes(peer.connectionState) || ["connected", "completed"].includes(peer.iceConnectionState);
+    }).length;
+  }
+
+  function updateStudioPeerCount() {
+    liveStudio.querySelectorAll("[data-live-peer-count]").forEach((item) => {
+      item.textContent = connectedPeerCount().toLocaleString();
+    });
+  }
+
+  function removeStudioPeer(viewerToken) {
+    const peer = peers.get(viewerToken);
+    if (!peer) return;
+    try {
+      peer.close();
+    } catch {
+      // Peer is already closed.
+    }
+    peers.delete(viewerToken);
+    updateStudioPeerCount();
   }
 
   function setLiveEmptyText(message) {
@@ -1731,6 +1786,7 @@ if (liveStudio) {
     startLiveRecording(localStream);
     startButton?.removeAttribute("disabled");
     setLiveCameraRecordingState();
+    updateLiveHealth(liveStudio, "Studio live", "connected");
     setLiveStudioStatus("Camera is live. Recording is being compressed for one saved video.");
     return localStream;
   }
@@ -1823,7 +1879,7 @@ if (liveStudio) {
     liveRecorder.onstart = () => {
       if (recordingStatus) recordingStatus.textContent = "Recording compressed video locally. It will save once when the live ends.";
     };
-    liveRecorder.start();
+    liveRecorder.start(10000);
   }
 
   async function getPeer(viewerToken) {
@@ -1840,10 +1896,25 @@ if (liveStudio) {
         type: "ice",
         payload: candidate,
       });
-    });
+    }, null, iceServers);
     if (!peer) return null;
+    const handlePeerState = () => {
+      updateStudioPeerCount();
+      if (["failed", "closed"].includes(peer.connectionState) || peer.iceConnectionState === "failed") {
+        removeStudioPeer(viewerToken);
+      } else if (peer.connectionState === "disconnected" || peer.iceConnectionState === "disconnected") {
+        window.setTimeout(() => {
+          if (peer.connectionState === "disconnected" || peer.iceConnectionState === "disconnected") {
+            removeStudioPeer(viewerToken);
+          }
+        }, 8000);
+      }
+    };
+    peer.onconnectionstatechange = handlePeerState;
+    peer.oniceconnectionstatechange = handlePeerState;
     stream.getTracks().forEach((track) => peer.addTrack(track, stream));
     peers.set(viewerToken, peer);
+    updateStudioPeerCount();
     return peer;
   }
 
@@ -1852,11 +1923,17 @@ if (liveStudio) {
       const response = await fetch(`${liveStudio.dataset.signalsUrl}?role=streamer&after=${lastSignalId}`);
       if (!response.ok) return;
       const payload = await response.json();
+      if (typeof payload.viewerCount !== "undefined") {
+        updateLiveViewerCount(liveStudio, payload.viewerCount);
+      }
       for (const signal of payload.signals || []) {
         lastSignalId = Math.max(lastSignalId, Number(signal.id));
         const peer = await getPeer(signal.viewerToken);
         if (!peer) continue;
         if (signal.type === "offer") {
+          if (peer.signalingState !== "stable") {
+            await peer.setLocalDescription({ type: "rollback" }).catch(() => {});
+          }
           await peer.setRemoteDescription(signal.payload);
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
@@ -1867,7 +1944,7 @@ if (liveStudio) {
             payload: answer,
           });
         } else if (signal.type === "ice") {
-          await peer.addIceCandidate(signal.payload);
+          await peer.addIceCandidate(signal.payload).catch(() => {});
         }
       }
     } catch {
@@ -1913,26 +1990,95 @@ if (liveStudio) {
 const liveWatch = document.querySelector("[data-live-watch]");
 
 if (liveWatch && "RTCPeerConnection" in window) {
-  const viewerToken = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+  const makeViewerToken = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+  let viewerToken = makeViewerToken();
   const video = liveWatch.querySelector("[data-live-remote]");
   const empty = liveWatch.querySelector("[data-live-empty]");
   const endedBanner = liveWatch.querySelector("[data-live-ended-banner]");
+  const iceServers = getLiveIceServers(liveWatch);
   let lastSignalId = 0;
   let watchIsEnded = liveWatch.dataset.liveEnded === "1";
-  const peer = createPeerConnection((candidate) => {
-    postLiveSignal(liveWatch.dataset.signalUrl, {
-      viewerToken,
-      type: "ice",
-      payload: candidate,
-    });
-  }, (event) => {
-    if (video && event.streams[0]) {
-      video.srcObject = event.streams[0];
-      empty?.classList.add("hidden");
-    }
-  });
+  let peer = null;
+  let reconnectTimer = null;
 
-  async function startWatching() {
+  function currentWatchState() {
+    if (!peer) return "connecting";
+    return peer.connectionState || peer.iceConnectionState || "connecting";
+  }
+
+  function setWatchState(label, state = "pending") {
+    updateLiveHealth(liveWatch, label, state);
+    if (empty && !watchIsEnded && !video?.srcObject) {
+      const target = empty.querySelector("strong");
+      if (target) target.textContent = label;
+    }
+  }
+
+  function closeWatchPeer() {
+    if (!peer) return;
+    try {
+      peer.close();
+    } catch {
+      // Peer is already closed.
+    }
+    peer = null;
+  }
+
+  function scheduleWatchReconnect() {
+    if (watchIsEnded || reconnectTimer) return;
+    setWatchState("Reconnecting", "pending");
+    reconnectTimer = window.setTimeout(() => {
+      reconnectTimer = null;
+      startWatching(true);
+    }, 2500);
+  }
+
+  function createWatchPeer() {
+    const nextPeer = createPeerConnection((candidate) => {
+      postLiveSignal(liveWatch.dataset.signalUrl, {
+        viewerToken,
+        type: "ice",
+        payload: candidate,
+      });
+    }, (event) => {
+      if (video && event.streams[0]) {
+        video.srcObject = event.streams[0];
+        empty?.classList.add("hidden");
+        setWatchState("Connected", "connected");
+      }
+    }, iceServers);
+    nextPeer.onconnectionstatechange = () => {
+      const state = currentWatchState();
+      if (["connected", "completed"].includes(state)) {
+        setWatchState("Connected", "connected");
+      } else if (["failed", "closed"].includes(state)) {
+        scheduleWatchReconnect();
+      } else if (state === "disconnected") {
+        setWatchState("Reconnecting", "pending");
+        window.setTimeout(() => {
+          if (!watchIsEnded && peer === nextPeer && currentWatchState() === "disconnected") {
+            scheduleWatchReconnect();
+          }
+        }, 6000);
+      } else {
+        setWatchState("Connecting", "pending");
+      }
+    };
+    nextPeer.oniceconnectionstatechange = nextPeer.onconnectionstatechange;
+    return nextPeer;
+  }
+
+  async function startWatching(reconnecting = false) {
+    if (watchIsEnded) return;
+    if (reconnecting) {
+      closeWatchPeer();
+      viewerToken = makeViewerToken();
+      lastSignalId = 0;
+      if (video) video.srcObject = null;
+      empty?.classList.remove("hidden");
+    }
+    peer = createWatchPeer();
+    setWatchState(reconnecting ? "Reconnecting" : "Connecting", "pending");
     try {
       peer.addTransceiver("video", { direction: "recvonly" });
       peer.addTransceiver("audio", { direction: "recvonly" });
@@ -1945,21 +2091,25 @@ if (liveWatch && "RTCPeerConnection" in window) {
       });
     } catch {
       // The browser may block WebRTC on unsupported environments.
+      scheduleWatchReconnect();
     }
   }
 
   async function handleWatchSignals() {
-    if (watchIsEnded) return;
+    if (watchIsEnded || !peer) return;
     try {
       const response = await fetch(`${liveWatch.dataset.signalsUrl}?viewerToken=${encodeURIComponent(viewerToken)}&after=${lastSignalId}`);
       if (!response.ok) return;
       const payload = await response.json();
+      if (typeof payload.viewerCount !== "undefined") {
+        updateLiveViewerCount(liveWatch, payload.viewerCount);
+      }
       for (const signal of payload.signals || []) {
         lastSignalId = Math.max(lastSignalId, Number(signal.id));
         if (signal.type === "answer") {
           await peer.setRemoteDescription(signal.payload);
         } else if (signal.type === "ice") {
-          await peer.addIceCandidate(signal.payload);
+          await peer.addIceCandidate(signal.payload).catch(() => {});
         }
       }
     } catch {
@@ -1973,26 +2123,63 @@ if (liveWatch && "RTCPeerConnection" in window) {
       const response = await fetch(liveWatch.dataset.statusUrl, { headers: { Accept: "application/json" } });
       if (!response.ok) return;
       const payload = await response.json();
+      if (typeof payload.viewerCount !== "undefined") {
+        updateLiveViewerCount(liveWatch, payload.viewerCount);
+      }
       if (payload.ended) {
         watchIsEnded = true;
+        setWatchState("Ended", "ended");
         endedBanner?.classList.remove("hidden");
         empty?.classList.add("hidden");
-        peer.close();
+        closeWatchPeer();
       }
     } catch {
       // Status polling resumes on the next interval.
     }
   }
 
+  async function sendViewerHeartbeat() {
+    if (watchIsEnded || !liveWatch.dataset.heartbeatUrl) return;
+    try {
+      const response = await fetch(liveWatch.dataset.heartbeatUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken,
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          viewerToken,
+          connectionState: currentWatchState(),
+        }),
+      });
+      if (response.status === 409) {
+        watchIsEnded = true;
+        setWatchState("Ended", "ended");
+        endedBanner?.classList.remove("hidden");
+        closeWatchPeer();
+        return;
+      }
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (typeof payload.viewerCount !== "undefined") {
+        updateLiveViewerCount(liveWatch, payload.viewerCount);
+      }
+    } catch {
+      // Heartbeat resumes on the next interval.
+    }
+  }
+
   if (watchIsEnded) {
     endedBanner?.classList.remove("hidden");
+    setWatchState("Ended", "ended");
   } else {
     startWatching();
   }
   async function scheduleWatchSignals() {
     await handleWatchSignals();
     if (watchIsEnded) return;
-    const connected = peer.connectionState === "connected" || peer.iceConnectionState === "connected";
+    const connected = peer && (peer.connectionState === "connected" || peer.iceConnectionState === "connected");
     const delay = document.hidden ? 12000 : connected ? 3500 : 900;
     window.setTimeout(scheduleWatchSignals, delay);
   }
@@ -2003,8 +2190,15 @@ if (liveWatch && "RTCPeerConnection" in window) {
     window.setTimeout(scheduleLiveStatus, document.hidden ? 30000 : 6500);
   }
 
+  async function scheduleViewerHeartbeat() {
+    await sendViewerHeartbeat();
+    if (watchIsEnded) return;
+    window.setTimeout(scheduleViewerHeartbeat, document.hidden ? 45000 : 18000);
+  }
+
   scheduleWatchSignals();
   scheduleLiveStatus();
+  scheduleViewerHeartbeat();
 }
 
 const liveEngagement = document.querySelector("[data-live-engagement]");
@@ -2055,6 +2249,9 @@ if (liveEngagement) {
       const payload = await response.json();
       (payload.comments || []).forEach(renderLiveComment);
       updateReactionCounts(payload.reactions, payload.myReaction);
+      if (typeof payload.viewerCount !== "undefined") {
+        updateLiveViewerCount(host, payload.viewerCount);
+      }
     } catch {
       // Engagement polling resumes on the next interval.
     }

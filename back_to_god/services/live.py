@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime, timedelta
 
 from back_to_god.core.db import connect_database, get_db
 from back_to_god.core.security import utc_now
@@ -13,6 +14,13 @@ MAX_SIGNAL_BYTES = 70000
 MAX_RECORDING_BYTES = 950 * 1024 * 1024
 VIDEO_TYPES = {"video/webm", "video/mp4", "video/ogg"}
 REACTION_TYPES = {"like", "heart", "amen", "clap", "fire"}
+SIGNAL_TTL_SECONDS = 180
+VIEWER_TTL_SECONDS = 45
+MAX_SIGNAL_ROWS = 160
+
+
+def _cutoff(seconds: int) -> str:
+    return (datetime.now() - timedelta(seconds=seconds)).isoformat(timespec="milliseconds")
 
 
 def _live_select() -> str:
@@ -191,7 +199,63 @@ def end_live_session(live_id: int) -> None:
         (now, now, live_id),
     )
     db.execute("DELETE FROM webrtc_signals WHERE live_session_id = ?", (live_id,))
+    db.execute("DELETE FROM live_viewers WHERE live_session_id = ?", (live_id,))
     db.commit()
+
+
+def cleanup_old_signals(live_id: int) -> None:
+    get_db().execute(
+        "DELETE FROM webrtc_signals WHERE live_session_id = ? AND created_at < ?",
+        (live_id, _cutoff(SIGNAL_TTL_SECONDS)),
+    )
+
+
+def cleanup_stale_live_viewers(live_id: int) -> None:
+    get_db().execute(
+        "DELETE FROM live_viewers WHERE live_session_id = ? AND last_seen_at < ?",
+        (live_id, _cutoff(VIEWER_TTL_SECONDS)),
+    )
+
+
+def active_viewer_count(live_id: int) -> int:
+    cleanup_stale_live_viewers(live_id)
+    row = get_db().execute(
+        """
+        SELECT COUNT(DISTINCT user_id) AS count
+        FROM live_viewers
+        WHERE live_session_id = ?
+          AND last_seen_at >= ?
+        """,
+        (live_id, _cutoff(VIEWER_TTL_SECONDS)),
+    ).fetchone()
+    get_db().commit()
+    return int(row["count"] or 0)
+
+
+def record_live_viewer(live_id: int, user_id: int, viewer_token: str, connection_state: str) -> int:
+    compact_token = normalize_text(viewer_token, 80)
+    if not compact_token:
+        raise ValueError("Missing viewer token.")
+    compact_state = normalize_text(connection_state, 40) or "connecting"
+    now = utc_now()
+    db = get_db()
+    cleanup_stale_live_viewers(live_id)
+    db.execute(
+        """
+        INSERT INTO live_viewers (
+            live_session_id, user_id, viewer_token, connection_state, connected_at, last_seen_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(live_session_id, viewer_token)
+        DO UPDATE SET
+            user_id = excluded.user_id,
+            connection_state = excluded.connection_state,
+            last_seen_at = excluded.last_seen_at
+        """,
+        (live_id, user_id, compact_token, compact_state, now, now),
+    )
+    db.commit()
+    return active_viewer_count(live_id)
 
 
 def add_signal(
@@ -205,6 +269,7 @@ def add_signal(
     if len(compact_payload.encode("utf-8")) > MAX_SIGNAL_BYTES:
         raise ValueError("The live signal is too large.")
 
+    cleanup_old_signals(live_id)
     cursor = get_db().execute(
         """
         INSERT INTO webrtc_signals (
@@ -226,14 +291,16 @@ def add_signal(
 
 
 def list_signals_for_streamer(live_id: int, after_id: int = 0) -> list[sqlite3.Row]:
+    cleanup_old_signals(live_id)
     return get_db().execute(
         """
         SELECT id, viewer_token, sender_role, signal_type, payload
         FROM webrtc_signals
         WHERE live_session_id = ? AND sender_role = 'viewer' AND id > ?
         ORDER BY id
+        LIMIT ?
         """,
-        (live_id, after_id),
+        (live_id, after_id, MAX_SIGNAL_ROWS),
     ).fetchall()
 
 
@@ -242,6 +309,7 @@ def list_signals_for_viewer(
     viewer_token: str,
     after_id: int = 0,
 ) -> list[sqlite3.Row]:
+    cleanup_old_signals(live_id)
     return get_db().execute(
         """
         SELECT id, viewer_token, sender_role, signal_type, payload
@@ -251,8 +319,9 @@ def list_signals_for_viewer(
           AND sender_role = 'streamer'
           AND id > ?
         ORDER BY id
+        LIMIT ?
         """,
-        (live_id, normalize_text(viewer_token, 80), after_id),
+        (live_id, normalize_text(viewer_token, 80), after_id, MAX_SIGNAL_ROWS),
     ).fetchall()
 
 

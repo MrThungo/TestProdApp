@@ -17,13 +17,25 @@
       data-engagement-url="{{ url_for('live.engagement', live_id=live['id']) }}"
       data-comment-url="{{ url_for('live.comment', live_id=live['id']) }}"
       data-react-url="{{ url_for('live.react', live_id=live['id']) }}"
+      data-heartbeat-url="{{ url_for('live.viewer_heartbeat', live_id=live['id']) }}"
       data-live-ended="{{ '1' if live['status'] == 'ended' else '0' }}"
+      data-ice-servers='{{ ice_servers | tojson }}'
     >
       <div class="live-video-frame">
         <a class="media-back-float" href="{{ url_for('live.index') }}" aria-label="Back to live">
           <span class="material-symbols-rounded">arrow_back</span>
         </a>
         <video data-live-remote autoplay playsinline controls></video>
+        <div class="live-health-panel" data-live-health>
+          <span>
+            <i class="live-health-dot pending" data-live-health-dot></i>
+            <strong data-live-health-label>{{ "Connecting" if live["status"] == "active" else "Ended" }}</strong>
+          </span>
+          <span>
+            <span class="material-symbols-rounded">visibility</span>
+            <strong data-live-viewer-count>{{ viewer_count }}</strong>
+          </span>
+        </div>
         <div class="live-empty-state" data-live-empty>
           <span class="material-symbols-rounded">live_tv</span>
           <strong>{{ "Waiting for stream" if live["status"] == "active" else "Live ended" }}</strong>
@@ -39,10 +51,28 @@
         <h1 class="text-3xl font-black">{{ live["title"] }}</h1>
         <p class="leading-7 text-btg-muted">{{ live["description"] or "Live from Back to God AOG City Centre." }}</p>
         <p class="text-sm text-btg-muted">Started by {{ live["streamer_name"] }}</p>
+        <p class="live-privacy-note">
+          <span class="material-symbols-rounded">visibility_lock</span>
+          <span>Watching never turns on your camera or microphone.</span>
+        </p>
+        <div class="live-metric-strip">
+          <span>
+            <strong data-live-viewer-count>{{ viewer_count }}</strong>
+            <small>watching</small>
+          </span>
+          <span>
+            <strong data-live-health-label>{{ "Connecting" if live["status"] == "active" else "Ended" }}</strong>
+            <small>status</small>
+          </span>
+        </div>
         {% if live["recording_available"] %}
           <a class="material-button material-button-tonal w-full" href="{{ url_for('live.recording_view', live_id=live['id'], back=url_for('live.watch', live_id=live['id'])) }}">
             <span class="material-symbols-rounded text-[20px]">movie</span>
             <span>Watch saved recording</span>
+          </a>
+          <a class="material-button material-button-filled w-full" href="{{ url_for('live.recording_download', live_id=live['id']) }}">
+            <span class="material-symbols-rounded text-[20px]">download</span>
+            <span>Download recording</span>
           </a>
         {% endif %}
         {% if can_manage_session %}

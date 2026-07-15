@@ -59,6 +59,10 @@ class Config:
     ENABLE_GZIP = os.environ.get("ENABLE_GZIP", "1") == "1"
     GZIP_MIN_BYTES = int(os.environ.get("GZIP_MIN_BYTES", "1024"))
     GZIP_COMPRESS_LEVEL = int(os.environ.get("GZIP_COMPRESS_LEVEL", "5"))
+    WEBRTC_STUN_URLS = os.environ.get("WEBRTC_STUN_URLS", "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302")
+    WEBRTC_TURN_URLS = os.environ.get("WEBRTC_TURN_URLS", "")
+    WEBRTC_TURN_USERNAME = os.environ.get("WEBRTC_TURN_USERNAME", "")
+    WEBRTC_TURN_CREDENTIAL = os.environ.get("WEBRTC_TURN_CREDENTIAL", "")
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"

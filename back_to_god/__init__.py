@@ -30,6 +30,7 @@ HIGH_FREQUENCY_ENDPOINTS = {
     "live.signal",
     "live.signals",
     "live.status",
+    "live.viewer_heartbeat",
     "messages.attachment",
     "messages.poll",
     "messages.presence",
@@ -313,6 +314,7 @@ def register_request_hooks(app: Flask) -> None:
             "live.recording_upload",
             "live.signals",
             "live.signal",
+            "live.viewer_heartbeat",
             "messages.attachment",
             "profile.photo",
         }

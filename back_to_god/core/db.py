@@ -253,6 +253,19 @@ def init_db() -> None:
             FOREIGN KEY (live_session_id) REFERENCES live_sessions (id)
         );
 
+        CREATE TABLE IF NOT EXISTS live_viewers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            live_session_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            viewer_token TEXT NOT NULL,
+            connection_state TEXT NOT NULL DEFAULT 'connecting',
+            connected_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            UNIQUE (live_session_id, viewer_token),
+            FOREIGN KEY (live_session_id) REFERENCES live_sessions (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sender_id INTEGER NOT NULL,
@@ -465,6 +478,10 @@ def init_db() -> None:
             ON committee_members (committee_id, sort_order, id);
         CREATE INDEX IF NOT EXISTS idx_webrtc_signals_session
             ON webrtc_signals (live_session_id, viewer_token, id);
+        CREATE INDEX IF NOT EXISTS idx_webrtc_signals_created
+            ON webrtc_signals (live_session_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_live_viewers_session_seen
+            ON live_viewers (live_session_id, last_seen_at);
         CREATE INDEX IF NOT EXISTS idx_messages_pair
             ON messages (sender_id, recipient_id, id);
         CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread
@@ -652,6 +669,28 @@ def migrate_db() -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_live_recordings_session
             ON live_recordings (live_session_id, deleted_at)
+        """
+    )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS live_viewers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            live_session_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            viewer_token TEXT NOT NULL,
+            connection_state TEXT NOT NULL DEFAULT 'connecting',
+            connected_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            UNIQUE (live_session_id, viewer_token),
+            FOREIGN KEY (live_session_id) REFERENCES live_sessions (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_live_viewers_session_seen
+            ON live_viewers (live_session_id, last_seen_at)
         """
     )
     _migrate_live_recording_chunks(db)
@@ -904,6 +943,10 @@ def migrate_db() -> None:
             ON committee_members (committee_id, sort_order, id);
         CREATE INDEX IF NOT EXISTS idx_webrtc_signals_session
             ON webrtc_signals (live_session_id, viewer_token, id);
+        CREATE INDEX IF NOT EXISTS idx_webrtc_signals_created
+            ON webrtc_signals (live_session_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_live_viewers_session_seen
+            ON live_viewers (live_session_id, last_seen_at);
         CREATE INDEX IF NOT EXISTS idx_messages_pair
             ON messages (sender_id, recipient_id, id);
         CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread

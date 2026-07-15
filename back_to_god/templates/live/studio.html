@@ -15,12 +15,23 @@
       data-signals-url="{{ url_for('live.signals', live_id=live['id']) }}"
       data-record-url="{{ url_for('live.recording_upload', live_id=live['id']) }}"
       data-engagement-url="{{ url_for('live.engagement', live_id=live['id']) }}"
+      data-ice-servers='{{ ice_servers | tojson }}'
     >
       <div class="live-video-frame">
         <a class="media-back-float" href="{{ url_for('live.index') }}" aria-label="Back to live">
           <span class="material-symbols-rounded">arrow_back</span>
         </a>
         <video data-live-local autoplay muted playsinline></video>
+        <div class="live-health-panel" data-live-health>
+          <span>
+            <i class="live-health-dot pending" data-live-health-dot></i>
+            <strong data-live-health-label>Studio idle</strong>
+          </span>
+          <span>
+            <span class="material-symbols-rounded">visibility</span>
+            <strong data-live-viewer-count>{{ viewer_count }}</strong>
+          </span>
+        </div>
         <div class="live-empty-state" data-live-empty>
           <span class="material-symbols-rounded">videocam</span>
           <strong>Camera preview</strong>
@@ -30,6 +41,16 @@
         <p class="text-xs font-black uppercase text-btg-gold">Studio</p>
         <h1 class="text-3xl font-black">{{ live["title"] }}</h1>
         <p class="leading-7 text-btg-muted">{{ live["description"] or "Members will see this live session in the app." }}</p>
+        <div class="live-metric-strip">
+          <span>
+            <strong data-live-viewer-count>{{ viewer_count }}</strong>
+            <small>watching</small>
+          </span>
+          <span>
+            <strong data-live-peer-count>0</strong>
+            <small>connected</small>
+          </span>
+        </div>
         <button class="material-button material-button-filled w-full" type="button" data-live-start-camera>
           <span class="material-symbols-rounded text-[20px]">videocam</span>
           <span>Start camera</span>

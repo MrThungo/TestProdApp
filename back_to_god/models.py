@@ -247,6 +247,21 @@ if SQLALCHEMY_AVAILABLE:
         created_at = Column(String(40), nullable=False)
 
 
+    class LiveViewer(Base):
+        __tablename__ = "live_viewers"
+        __table_args__ = (
+            UniqueConstraint("live_session_id", "viewer_token", name="uq_live_viewers_session_token"),
+        )
+
+        id = Column(Integer, primary_key=True)
+        live_session_id = Column(Integer, ForeignKey("live_sessions.id"), nullable=False)
+        user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+        viewer_token = Column(String(120), nullable=False)
+        connection_state = Column(String(40), nullable=False, default="connecting")
+        connected_at = Column(String(40), nullable=False)
+        last_seen_at = Column(String(40), nullable=False)
+
+
     class Message(Base):
         __tablename__ = "messages"
 
@@ -446,7 +461,7 @@ if SQLALCHEMY_AVAILABLE:
 else:
     User = Visitor = LiveSession = Notification = Announcement = GalleryCategory = None
     GalleryMedia = GallerySlideshowItem = Committee = CommitteeMember = None
-    WebRTCSignal = Message = None
+    WebRTCSignal = LiveViewer = Message = None
     MessageAttachment = LiveRecording = LiveComment = LiveReaction = None
     TimelinePost = TimelinePostViewer = TimelineMedia = TimelineComment = None
     TimelineReaction = AuditLog = DepositSlip = PasswordResetToken = FinanceOffering = None

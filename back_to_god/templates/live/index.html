@@ -45,7 +45,7 @@
           <div class="flex items-center justify-between gap-3">
             <span class="grid min-w-0 gap-1">
               <strong class="truncate">{{ live["title"] }}</strong>
-              <small class="truncate text-btg-muted">Started by {{ live["streamer_name"] }}</small>
+              <small class="truncate text-btg-muted">Started by {{ live["streamer_name"] }} - {{ viewer_counts.get(live['id'], 0) }} watching</small>
             </span>
             <em class="live-chip">Live</em>
           </div>
@@ -76,6 +76,7 @@
             <strong class="truncate">{{ live["title"] }}</strong>
             <small class="truncate text-btg-muted">
               {{ live["started_at"] | pretty_date }} by {{ live["streamer_name"] }}
+              {% if live["status"] == "active" %} - {{ viewer_counts.get(live['id'], 0) }} watching{% endif %}
               {% if live["recording_available"] %} - recording saved{% endif %}
             </small>
           </span>
