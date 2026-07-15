@@ -1098,15 +1098,60 @@ document.addEventListener("submit", async (event) => {
   }
 });
 
+const messageInbox = document.querySelector("[data-message-inbox]");
+
+if (messageInbox) {
+  const searchInput = messageInbox.querySelector("[data-message-search]");
+  const filterButtons = messageInbox.querySelectorAll("[data-message-filter]");
+  const contacts = Array.from(messageInbox.querySelectorAll("[data-message-contact]"));
+  const emptyState = messageInbox.querySelector("[data-message-empty]");
+  let activeFilter = "all";
+
+  function applyMessageInboxFilters() {
+    const query = (searchInput?.value || "").trim().toLowerCase();
+    let visibleCount = 0;
+
+    contacts.forEach((contact) => {
+      const matchesSearch = !query || (contact.dataset.contactSearch || "").includes(query);
+      const matchesFilter =
+        activeFilter === "all" ||
+        (activeFilter === "unread" && contact.dataset.contactUnread === "1") ||
+        (activeFilter === "online" && contact.dataset.contactOnline === "1");
+      const visible = matchesSearch && matchesFilter;
+      contact.classList.toggle("hidden", !visible);
+      if (visible) visibleCount += 1;
+    });
+
+    emptyState?.classList.toggle("hidden", visibleCount !== 0);
+  }
+
+  searchInput?.addEventListener("input", applyMessageInboxFilters);
+  filterButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      activeFilter = button.dataset.messageFilter || "all";
+      filterButtons.forEach((item) => item.classList.toggle("active", item === button));
+      applyMessageInboxFilters();
+    });
+  });
+}
+
 const chatThread = document.querySelector("[data-chat-thread]");
 
 if (chatThread) {
   const messagesContainer = chatThread.querySelector("[data-chat-messages]");
   const form = chatThread.querySelector("[data-chat-form]");
   const presenceLabel = chatThread.querySelector("[data-chat-presence]");
+  const presenceDot = chatThread.querySelector("[data-chat-presence-dot]");
+  const bodyInput = chatThread.querySelector("[data-chat-body]");
   const imageInput = chatThread.querySelector("[data-chat-image-input]");
   const videoInput = chatThread.querySelector("[data-chat-video-input]");
   const fileInput = chatThread.querySelector("[data-chat-file-input]");
+  const attachToggle = chatThread.querySelector("[data-chat-attach-toggle]");
+  const attachmentTray = chatThread.querySelector("[data-chat-attachment-tray]");
+  const attachmentPreview = chatThread.querySelector("[data-chat-attachment-preview]");
+  const attachmentName = chatThread.querySelector("[data-chat-attachment-name]");
+  const attachmentSize = chatThread.querySelector("[data-chat-attachment-size]");
+  const attachmentClear = chatThread.querySelector("[data-chat-attachment-clear]");
   const imageButton = chatThread.querySelector("[data-chat-image-button]");
   const videoButton = chatThread.querySelector("[data-chat-video-button]");
   const fileButton = chatThread.querySelector("[data-chat-file-button]");
@@ -1114,6 +1159,11 @@ if (chatThread) {
   const voiceCancel = chatThread.querySelector("[data-chat-voice-cancel]");
   const voiceStatus = chatThread.querySelector("[data-chat-voice-status]");
   const actionPopover = chatThread.querySelector("[data-chat-action-popover]");
+  const latestButton = chatThread.querySelector("[data-chat-latest]");
+  const searchToggle = chatThread.querySelector("[data-chat-search-toggle]");
+  const searchPanel = chatThread.querySelector("[data-chat-search-panel]");
+  const searchInput = chatThread.querySelector("[data-chat-search-input]");
+  const searchCount = chatThread.querySelector("[data-chat-search-count]");
   let lastMessageId = 0;
   let lastChangeAt = "";
   let voiceRecorder = null;
@@ -1140,6 +1190,61 @@ if (chatThread) {
   function scrollChatToEnd() {
     if (messagesContainer) {
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    latestButton?.classList.add("hidden");
+  }
+
+  function updateLatestButton() {
+    latestButton?.classList.toggle("hidden", chatIsNearEnd());
+  }
+
+  function resizeChatBody() {
+    if (!bodyInput) return;
+    bodyInput.style.height = "auto";
+    bodyInput.style.height = `${Math.min(bodyInput.scrollHeight, 138)}px`;
+  }
+
+  function formatBytes(bytes) {
+    const size = Number(bytes || 0);
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    if (size >= 1024) return `${Math.ceil(size / 1024)} KB`;
+    return `${size} B`;
+  }
+
+  function clearAttachmentSelection() {
+    [imageInput, videoInput, fileInput].forEach((inputElement) => {
+      if (inputElement) inputElement.value = "";
+    });
+    attachmentPreview?.classList.add("hidden");
+    if (attachmentName) attachmentName.textContent = "";
+    if (attachmentSize) attachmentSize.textContent = "";
+  }
+
+  function showAttachmentPreview(inputElement) {
+    if (!inputElement?.files?.[0]) return;
+    [imageInput, videoInput, fileInput].forEach((otherInput) => {
+      if (otherInput && otherInput !== inputElement) otherInput.value = "";
+    });
+    const file = inputElement.files[0];
+    if (attachmentName) attachmentName.textContent = file.name;
+    if (attachmentSize) attachmentSize.textContent = formatBytes(file.size);
+    attachmentPreview?.classList.remove("hidden");
+    attachmentTray?.classList.add("hidden");
+  }
+
+  function applyChatSearch() {
+    if (!messagesContainer) return;
+    const query = (searchInput?.value || "").trim().toLowerCase();
+    let matches = 0;
+    messagesContainer.querySelectorAll("[data-message-id]").forEach((item) => {
+      const text = (item.dataset.messageSearch || item.textContent || "").toLowerCase();
+      const matched = Boolean(query) && text.includes(query);
+      item.classList.toggle("search-hidden", Boolean(query) && !matched);
+      item.classList.toggle("search-match", matched);
+      if (matched) matches += 1;
+    });
+    if (searchCount) {
+      searchCount.textContent = query ? `${matches} match${matches === 1 ? "" : "es"}` : "";
     }
   }
 
@@ -1412,13 +1517,22 @@ if (chatThread) {
     }
   });
 
-  messagesContainer?.addEventListener("scroll", hideChatActionPopover, { passive: true });
+  messagesContainer?.addEventListener("scroll", () => {
+    hideChatActionPopover();
+    updateLatestButton();
+  }, { passive: true });
 
   function buildMessageElement(message) {
     const item = document.createElement("article");
     item.className = `chat-bubble ${message.mine ? "mine" : ""} ${message.deletedAt ? "deleted" : ""}`;
     item.dataset.messageId = message.id;
     item.dataset.messageUpdated = message.updatedAt || message.createdAt || "";
+    item.dataset.messageSearch = [
+      message.body || "",
+      message.attachment?.originalName || "",
+      message.attachment?.kind || "",
+      message.senderName || "",
+    ].join(" ").toLowerCase();
     item.dataset.messageEditUrl = message.editUrl || "";
     item.dataset.messageDeleteUrl = message.deleteUrl || "";
     item.dataset.messageCanEdit = message.mine && message.body && !message.deletedAt ? "1" : "0";
@@ -1457,13 +1571,23 @@ if (chatThread) {
       const link = document.createElement("a");
       link.className = "chat-attachment-link";
       link.href = message.attachment.viewUrl || message.attachment.url;
-      link.innerHTML = '<span class="material-symbols-rounded">play_circle</span><span>Open video</span>';
+      const icon = document.createElement("span");
+      icon.className = "material-symbols-rounded";
+      icon.textContent = "play_circle";
+      const label = document.createElement("span");
+      label.textContent = message.attachment.originalName || "Open video";
+      link.append(icon, label);
       item.appendChild(link);
     } else if (message.attachment?.kind === "file") {
       const link = document.createElement("a");
       link.className = "chat-attachment-link";
       link.href = message.attachment.viewUrl || message.attachment.url;
-      link.innerHTML = '<span class="material-symbols-rounded">attach_file</span><span>Open attachment</span>';
+      const icon = document.createElement("span");
+      icon.className = "material-symbols-rounded";
+      icon.textContent = "attach_file";
+      const label = document.createElement("span");
+      label.textContent = message.attachment.originalName || "Open attachment";
+      link.append(icon, label);
       item.appendChild(link);
     }
 
@@ -1485,6 +1609,13 @@ if (chatThread) {
       edited.textContent = " edited";
       time.appendChild(edited);
     }
+    if (message.mine && !message.deletedAt) {
+      const readState = document.createElement("span");
+      readState.className = "chat-read-state material-symbols-rounded";
+      readState.title = message.isRead ? "Read" : "Sent";
+      readState.textContent = message.isRead ? "done_all" : "done";
+      time.appendChild(readState);
+    }
     item.appendChild(time);
 
     attachMessageActions(item);
@@ -1505,7 +1636,13 @@ if (chatThread) {
     if (message.updatedAt && message.updatedAt > lastChangeAt) {
       lastChangeAt = message.updatedAt;
     }
-    if (shouldScroll) scrollChatToEnd();
+    if (shouldScroll) {
+      scrollChatToEnd();
+    } else if (!existing) {
+      latestButton?.classList.remove("hidden");
+    }
+    applyChatSearch();
+    updateLatestButton();
   }
 
   async function sendChatForm(formData) {
@@ -1534,6 +1671,7 @@ if (chatThread) {
       if (presenceLabel && payload.presence) {
         presenceLabel.textContent = payload.presence.label;
       }
+      presenceDot?.classList.toggle("online", Boolean(payload.presence?.online));
     } catch {
       // Chat polling resumes on the next interval.
     }
@@ -1541,42 +1679,61 @@ if (chatThread) {
 
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const input = form.querySelector('input[name="body"]');
+    const input = form.querySelector('[name="body"]');
     const body = input?.value.trim() || "";
     const hasAttachment = [imageInput, videoInput, fileInput].some((inputElement) => inputElement?.files && inputElement.files[0]);
     if (!body && !hasAttachment) return;
 
     try {
+      form.classList.add("is-sending");
       const formData = new FormData(form);
       const sent = await sendChatForm(formData);
       if (sent) {
-        input.value = "";
-        if (imageInput) imageInput.value = "";
-        if (videoInput) videoInput.value = "";
-        if (fileInput) fileInput.value = "";
+        if (input) input.value = "";
+        resizeChatBody();
+        clearAttachmentSelection();
       }
     } catch {
       // Message send can be retried by the user.
+    } finally {
+      form.classList.remove("is-sending");
     }
   });
 
+  attachToggle?.addEventListener("click", () => {
+    attachmentTray?.classList.toggle("hidden");
+  });
+  attachmentClear?.addEventListener("click", clearAttachmentSelection);
   imageButton?.addEventListener("click", () => imageInput?.click());
   videoButton?.addEventListener("click", () => videoInput?.click());
   fileButton?.addEventListener("click", () => fileInput?.click());
-  imageInput?.addEventListener("change", () => {
-    if (imageInput.files && imageInput.files[0]) {
-      form?.requestSubmit();
+  imageInput?.addEventListener("change", () => showAttachmentPreview(imageInput));
+  videoInput?.addEventListener("change", () => showAttachmentPreview(videoInput));
+  fileInput?.addEventListener("change", () => showAttachmentPreview(fileInput));
+
+  bodyInput?.addEventListener("input", resizeChatBody);
+  bodyInput?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    form?.requestSubmit();
+  });
+
+  latestButton?.addEventListener("click", scrollChatToEnd);
+  searchToggle?.addEventListener("click", () => {
+    searchPanel?.classList.toggle("hidden");
+    if (!searchPanel?.classList.contains("hidden")) {
+      searchInput?.focus();
+    } else if (searchInput) {
+      searchInput.value = "";
+      applyChatSearch();
     }
   });
-  videoInput?.addEventListener("change", () => {
-    if (videoInput.files && videoInput.files[0]) {
-      form?.requestSubmit();
-    }
-  });
-  fileInput?.addEventListener("change", () => {
-    if (fileInput.files && fileInput.files[0]) {
-      form?.requestSubmit();
-    }
+  searchInput?.addEventListener("input", applyChatSearch);
+  searchInput?.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    searchInput.value = "";
+    searchPanel?.classList.add("hidden");
+    applyChatSearch();
   });
 
   async function stopVoiceRecording() {
@@ -1640,7 +1797,9 @@ if (chatThread) {
   });
 
   messagesContainer?.querySelectorAll("[data-message-id]").forEach(attachMessageActions);
+  resizeChatBody();
   scrollChatToEnd();
+  updateLatestButton();
 
   async function scheduleChatPoll() {
     await pollChat();

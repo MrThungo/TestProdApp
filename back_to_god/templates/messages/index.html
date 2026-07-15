@@ -4,61 +4,109 @@
 
 {% block page %}
   {% include "partials/app_header.html" %}
-  <main class="mx-auto grid w-[calc(100%_-_2rem)] max-w-[860px] gap-6 pb-28 pt-6">
+  <main class="message-inbox-shell" data-message-inbox>
     {% include "partials/flash.html" %}
 
-    <section>
-      <p class="mb-1 text-xs font-black uppercase text-btg-gold">Communication</p>
-      <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Messages</h1>
-      <p class="mt-3 max-w-2xl leading-7 text-btg-muted">Chat with other church app users.</p>
+    <section class="message-inbox-hero">
+      <div>
+        <p class="mb-1 text-xs font-black uppercase text-btg-gold">Communication</p>
+        <h1 class="text-[clamp(2.5rem,12vw,5rem)] font-black leading-none">Messages</h1>
+      </div>
+      <div class="message-inbox-stats" aria-label="Message stats">
+        <span>
+          <strong>{{ users | length }}</strong>
+          <small>contacts</small>
+        </span>
+        <span>
+          <strong>{{ unread_total }}</strong>
+          <small>unread</small>
+        </span>
+        <span>
+          <strong>{{ online_total }}</strong>
+          <small>online</small>
+        </span>
+      </div>
     </section>
 
-    <section class="grid gap-3">
+    <section class="message-command-bar">
+      <label class="message-search">
+        <span class="material-symbols-rounded">search</span>
+        <input type="search" autocomplete="off" placeholder="Search messages" data-message-search />
+      </label>
+      <div class="message-filter-tabs" role="tablist" aria-label="Message filters">
+        <button class="active" type="button" data-message-filter="all">All</button>
+        <button type="button" data-message-filter="unread">Unread</button>
+        <button type="button" data-message-filter="online">Online</button>
+      </div>
+    </section>
+
+    <section class="message-list" data-message-list>
       {% for user in users %}
-        {% set presence = presence_state(user["last_seen_at"]) %}
+        {% set presence = presence_by_user[user["id"]] %}
         {% set last = last_messages.get(user["id"]) %}
-        <a class="message-list-item" href="{{ url_for('messages.thread', user_id=user['id']) }}">
+        {% set unread_count = unread_counts.get(user["id"], 0) %}
+        {% set preview %}
+          {% if last %}
+            {% if last["deleted_at"] %}
+              Message deleted
+            {% elif last["body"] %}
+              {{ last["body"] }}
+            {% elif last["media_kind"] == "image" %}
+              Photo
+            {% elif last["media_kind"] == "voice" %}
+              Voice note
+            {% elif last["media_kind"] == "video" %}
+              Video
+            {% elif last["media_kind"] == "file" %}
+              {{ last["original_name"] or "Attachment" }}
+            {% else %}
+              Message
+            {% endif %}
+          {% else %}
+            {{ presence.label }}
+          {% endif %}
+        {% endset %}
+        <a
+          class="message-list-item {% if unread_count %}has-unread{% endif %}"
+          href="{{ url_for('messages.thread', user_id=user['id']) }}"
+          data-message-contact
+          data-contact-unread="{{ '1' if unread_count else '0' }}"
+          data-contact-online="{{ '1' if presence.online else '0' }}"
+          data-contact-search="{{ (user['full_name'] ~ ' ' ~ user['email'] ~ ' ' ~ role_labels[user['role']] ~ ' ' ~ preview) | lower }}"
+        >
           {% if user["profile_photo"] %}
             <img class="message-avatar" src="{{ url_for('profile.photo', filename=user['profile_photo']) }}" alt="" />
           {% else %}
             <span class="message-avatar fallback">{{ user["full_name"][:1] }}</span>
           {% endif %}
-          <span class="grid min-w-0 gap-1">
-            <span class="flex items-center gap-2">
-              <strong class="truncate">{{ user["full_name"] }}</strong>
-              <span class="presence-dot {% if presence.online %}online{% endif %}"></span>
+          <span class="message-contact-main">
+            <span class="message-contact-topline">
+              <strong>{{ user["full_name"] }}</strong>
+              <em>{{ role_labels[user["role"]] }}</em>
             </span>
-            <small class="truncate text-btg-muted">
-              {% if last %}
-                {% if last["deleted_at"] %}
-                  Message deleted
-                {% elif last["body"] %}
-                  {{ last["body"] }}
-                {% elif last["media_kind"] == "image" %}
-                  Photo
-                {% elif last["media_kind"] == "voice" %}
-                  Voice note
-                {% elif last["media_kind"] == "video" %}
-                  Video
-                {% elif last["media_kind"] == "file" %}
-                  Attachment
-                {% else %}
-                  Message
-                {% endif %}
-              {% else %}
-                {{ presence.label }}
-              {% endif %}
+            <small>
+              {% if last and last["sender_id"] == g.user["id"] %}<b>You:</b>{% endif %}
+              {{ preview | trim }}
             </small>
           </span>
-          {% if unread_counts.get(user["id"]) %}
-            <em class="notification-dot static-dot">{{ unread_counts[user["id"]] }}</em>
-          {% endif %}
+          <span class="message-contact-side">
+            <small>{{ last["created_at"] | chat_timestamp if last else presence.label }}</small>
+            <span class="presence-pill {% if presence.online %}online{% endif %}">
+              <i></i>{{ "Online" if presence.online else "Away" }}
+            </span>
+            {% if unread_count %}
+              <em class="message-unread-count">{{ unread_count }}</em>
+            {% endif %}
+          </span>
         </a>
       {% else %}
         <article class="rounded-material border border-dashed border-[#b8c7bb] bg-white/70 p-5 text-center text-btg-muted">
           No users available for chat.
         </article>
       {% endfor %}
+      <article class="message-empty-state hidden" data-message-empty>
+        No conversations match.
+      </article>
     </section>
   </main>
   {% include "partials/bottom_nav.html" %}

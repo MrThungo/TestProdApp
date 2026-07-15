@@ -26,6 +26,12 @@ FILE_TYPES = {
 }
 
 
+def normalize_message_body(value: str, limit: int = 900) -> str:
+    normalized_lines = [" ".join(line.split()) for line in (value or "").replace("\r\n", "\n").split("\n")]
+    compact = "\n".join(line for line in normalized_lines if line).strip()
+    return compact[:limit]
+
+
 def presence_state(last_seen_at: str | None) -> dict[str, str | bool]:
     if not last_seen_at:
         return {"online": False, "label": "Offline"}
@@ -91,7 +97,7 @@ def send_message(
     media_file=None,
     media_kind: str | None = None,
 ) -> int:
-    compact_body = normalize_text(body, 900)
+    compact_body = normalize_message_body(body, 900)
     sender = get_db().execute(
         "SELECT full_name, role FROM users WHERE id = ?",
         (sender_id,),
@@ -163,13 +169,15 @@ def list_thread(current_user_id: int, other_user_id: int, after_id: int = 0) -> 
 
 
 def mark_thread_read(current_user_id: int, other_user_id: int) -> None:
+    now = utc_now()
     get_db().execute(
         """
         UPDATE messages
-        SET is_read = 1
+        SET is_read = 1,
+            updated_at = ?
         WHERE recipient_id = ? AND sender_id = ? AND is_read = 0
         """,
-        (current_user_id, other_user_id),
+        (now, current_user_id, other_user_id),
     )
     get_db().commit()
 
@@ -350,7 +358,7 @@ def edit_message(message_id: int, user_id: int, body: str) -> None:
     if message["deleted_at"]:
         raise ValueError("Deleted messages cannot be edited.")
 
-    compact_body = normalize_text(body, 900)
+    compact_body = normalize_message_body(body, 900)
     if not compact_body:
         raise ValueError("Message cannot be empty.")
     now = utc_now()

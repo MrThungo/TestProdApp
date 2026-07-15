@@ -14,11 +14,26 @@
       {% else %}
         <span class="message-avatar fallback">{{ other_user["full_name"][:1] }}</span>
       {% endif %}
-      <span class="grid min-w-0">
-        <strong class="truncate">{{ other_user["full_name"] }}</strong>
-        <small class="text-btg-muted" data-chat-presence>{{ presence.label }}</small>
+      <span class="chat-thread-person">
+        <strong>{{ other_user["full_name"] }}</strong>
+        <small>
+          <i class="presence-dot {% if presence.online %}online{% endif %}" data-chat-presence-dot></i>
+          <span data-chat-presence>{{ presence.label }}</span>
+          <em>{{ role_labels[other_user["role"]] }}</em>
+        </small>
       </span>
+      <button class="icon-action" type="button" data-chat-search-toggle aria-label="Search conversation" title="Search conversation">
+        <span class="material-symbols-rounded">search</span>
+      </button>
     </header>
+
+    <section class="chat-thread-search hidden" data-chat-search-panel>
+      <label>
+        <span class="material-symbols-rounded">search</span>
+        <input type="search" autocomplete="off" placeholder="Search this chat" data-chat-search-input />
+      </label>
+      <small data-chat-search-count></small>
+    </section>
 
     <section class="chat-messages" data-chat-messages>
       {% for message in messages %}
@@ -34,6 +49,7 @@
           data-message-can-edit="{{ '1' if is_mine and message['body'] and not is_deleted else '0' }}"
           data-message-can-delete="{{ '1' if is_mine and not is_deleted else '0' }}"
           data-attachment-delete-url="{% if has_deletable_attachment %}{{ url_for('messages.delete_attachment', attachment_id=message['attachment_id']) }}{% endif %}"
+          data-message-search="{{ (message['body'] or message['original_name'] or message['media_kind'] or '') | lower }}"
           {% if is_mine and not is_deleted %}tabindex="0"{% endif %}
         >
           {% if is_deleted %}
@@ -66,10 +82,17 @@
             {% if message["edited_at"] and not is_deleted %}
               <span data-message-edited>edited</span>
             {% endif %}
+            {% if is_mine and not is_deleted %}
+              <span class="chat-read-state material-symbols-rounded" title="{{ 'Read' if message['is_read'] else 'Sent' }}">{{ "done_all" if message["is_read"] else "done" }}</span>
+            {% endif %}
           </small>
         </article>
       {% endfor %}
     </section>
+    <button class="chat-latest-button hidden" type="button" data-chat-latest>
+      <span class="material-symbols-rounded">keyboard_arrow_down</span>
+      <span>Latest</span>
+    </button>
     <div class="chat-action-popover hidden" data-chat-action-popover role="menu" aria-hidden="true"></div>
 
     <form class="chat-compose" data-chat-form enctype="multipart/form-data">
@@ -77,16 +100,21 @@
       <input class="hidden" type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" data-chat-image-input />
       <input class="hidden" type="file" name="video" accept="video/mp4,video/webm,video/ogg" data-chat-video-input />
       <input class="hidden" type="file" name="attachment" accept="application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-chat-file-input />
-      <button class="chat-icon-button" type="button" data-chat-image-button aria-label="Send picture" title="Send picture">
-        <span class="material-symbols-rounded">image</span>
+      <button class="chat-icon-button" type="button" data-chat-attach-toggle aria-label="Add attachment" title="Add attachment">
+        <span class="material-symbols-rounded">add</span>
       </button>
-      <button class="chat-icon-button" type="button" data-chat-video-button aria-label="Send video" title="Send video">
-        <span class="material-symbols-rounded">movie</span>
-      </button>
-      <button class="chat-icon-button" type="button" data-chat-file-button aria-label="Send attachment" title="Send attachment">
-        <span class="material-symbols-rounded">attach_file</span>
-      </button>
-      <input class="material-field" name="body" autocomplete="off" maxlength="900" placeholder="Message" />
+      <div class="chat-attachment-tray hidden" data-chat-attachment-tray>
+        <button class="chat-icon-button" type="button" data-chat-image-button aria-label="Send picture" title="Send picture">
+          <span class="material-symbols-rounded">image</span>
+        </button>
+        <button class="chat-icon-button" type="button" data-chat-video-button aria-label="Send video" title="Send video">
+          <span class="material-symbols-rounded">movie</span>
+        </button>
+        <button class="chat-icon-button" type="button" data-chat-file-button aria-label="Send attachment" title="Send attachment">
+          <span class="material-symbols-rounded">attach_file</span>
+        </button>
+      </div>
+      <textarea class="material-field" name="body" autocomplete="off" maxlength="900" rows="1" placeholder="Message" data-chat-body></textarea>
       <button class="chat-icon-button" type="button" data-chat-voice-button aria-label="Record voice note" title="Record voice note">
         <span class="material-symbols-rounded">mic</span>
       </button>
@@ -96,6 +124,14 @@
       <button class="material-button material-button-filled" type="submit" aria-label="Send" title="Send">
         <span class="material-symbols-rounded text-[20px]">send</span>
       </button>
+      <div class="chat-attachment-preview hidden" data-chat-attachment-preview>
+        <span class="material-symbols-rounded">draft</span>
+        <strong data-chat-attachment-name></strong>
+        <small data-chat-attachment-size></small>
+        <button type="button" data-chat-attachment-clear aria-label="Remove attachment">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
       <small class="chat-recording-status hidden" data-chat-voice-status>Recording... tap mic to send or X to cancel.</small>
     </form>
   </main>

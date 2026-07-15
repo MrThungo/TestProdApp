@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, abort, g, jsonify, redirect, render_template, request, url_for
 
+from back_to_god.constants import ROLE_LABELS
 from back_to_god.core.media import inline_disposition, media_response
 from back_to_god.core.permissions import login_required
 from back_to_god.core.security import validate_csrf
@@ -41,12 +42,14 @@ def _message_payload(row) -> dict:
         "deletedAt": deleted_at,
         "timeLabel": _chat_time(row["created_at"]),
         "mine": row["sender_id"] == g.user["id"],
+        "isRead": bool(row["is_read"]) if "is_read" in row.keys() else False,
         "editUrl": url_for("messages.edit", message_id=row["id"]),
         "deleteUrl": url_for("messages.delete", message_id=row["id"]),
         "attachment": {
             "id": attachment_id,
             "kind": row["media_kind"],
             "mimeType": row["mime_type"],
+            "originalName": row["original_name"],
             "sizeBytes": row["size_bytes"],
             "url": url_for("messages.attachment", attachment_id=attachment_id),
             "viewUrl": url_for("messages.attachment_view", attachment_id=attachment_id),
@@ -72,6 +75,7 @@ def _uploaded_file(name: str):
 @login_required
 def index():
     last_messages = last_message_by_user(g.user["id"])
+    unread_counts = unread_by_sender(g.user["id"])
     users = sorted(
         list_messageable_users(g.user["id"]),
         key=lambda user: last_messages.get(user["id"])["created_at"]
@@ -79,12 +83,17 @@ def index():
         else "",
         reverse=True,
     )
+    presence_by_user = {user["id"]: presence_state(user["last_seen_at"]) for user in users}
     return render_template(
         "messages/index.html",
         users=users,
-        unread_counts=unread_by_sender(g.user["id"]),
+        unread_counts=unread_counts,
+        unread_total=sum(unread_counts.values()),
         last_messages=last_messages,
+        online_total=sum(1 for state in presence_by_user.values() if state["online"]),
+        presence_by_user=presence_by_user,
         presence_state=presence_state,
+        role_labels=ROLE_LABELS,
     )
 
 
@@ -100,6 +109,7 @@ def thread(user_id: int):
         other_user=other_user,
         messages=messages,
         presence=presence_state(other_user["last_seen_at"]),
+        role_labels=ROLE_LABELS,
     )
 
 

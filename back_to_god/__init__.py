@@ -4,7 +4,7 @@ import gzip
 import time
 import uuid
 
-from flask import Flask, current_app, g, redirect, render_template, request, session, url_for
+from flask import Flask, current_app, flash, g, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import HTTPException
 
 from .config import Config
@@ -21,6 +21,8 @@ from .services.users import touch_presence
 
 PRESENCE_WRITE_INTERVAL_SECONDS = 180
 REMINDER_DISPATCH_INTERVAL_SECONDS = 300
+SESSION_ACTIVITY_KEY = "last_activity_at"
+SESSION_EXPIRED_MESSAGE = "Your session expired after a period of inactivity. Please sign in again."
 HIGH_FREQUENCY_ENDPOINTS = {
     "announcements.poll",
     "gallery.media",
@@ -91,6 +93,45 @@ def _gzip_response(response):
 def _finalize_response(response):
     response.headers.setdefault("X-Request-ID", getattr(g, "request_id", ""))
     return _gzip_response(response)
+
+
+def _request_prefers_json() -> bool:
+    if request.path.startswith("/api/") or request.endpoint in HIGH_FREQUENCY_ENDPOINTS:
+        return True
+    if request.headers.get("X-Requested-With", "").lower() == "xmlhttprequest":
+        return True
+
+    best_match = request.accept_mimetypes.best_match(["application/json", "text/html"])
+    return (
+        best_match == "application/json"
+        and request.accept_mimetypes["application/json"] > request.accept_mimetypes["text/html"]
+    )
+
+
+def _idle_session_expired_response(now_seconds: int):
+    timeout_seconds = int(current_app.config.get("SESSION_IDLE_TIMEOUT_SECONDS", 30 * 60))
+    if timeout_seconds <= 0:
+        return None
+
+    try:
+        last_activity_at = int(session.get(SESSION_ACTIVITY_KEY, 0))
+    except (TypeError, ValueError):
+        last_activity_at = 0
+
+    if last_activity_at <= 0:
+        session[SESSION_ACTIVITY_KEY] = now_seconds
+        return None
+
+    if now_seconds - last_activity_at <= timeout_seconds:
+        return None
+
+    session.clear()
+    g.user = None
+    if _request_prefers_json():
+        return jsonify({"error": "session_expired", "message": SESSION_EXPIRED_MESSAGE}), 401
+
+    flash(SESSION_EXPIRED_MESSAGE, "warning")
+    return redirect(url_for("auth.login"))
 
 
 def create_app(config: type[Config] = Config) -> Flask:
@@ -208,6 +249,12 @@ def register_request_hooks(app: Flask) -> None:
             g.user = None
             return
 
+        now_seconds = int(time.time())
+        high_frequency_request = request.endpoint in HIGH_FREQUENCY_ENDPOINTS
+        expired_response = _idle_session_expired_response(now_seconds)
+        if expired_response is not None:
+            return expired_response
+
         g.user = get_db().execute(
             """
             SELECT
@@ -229,8 +276,8 @@ def register_request_hooks(app: Flask) -> None:
             session.clear()
             return
 
-        now_seconds = int(time.time())
-        high_frequency_request = request.endpoint in HIGH_FREQUENCY_ENDPOINTS
+        if not high_frequency_request:
+            session[SESSION_ACTIVITY_KEY] = now_seconds
 
         if (
             not high_frequency_request
